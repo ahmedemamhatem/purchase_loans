@@ -1,0 +1,201 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "PLRP-.{employee}.-.#####",
+ "creation": "2024-11-06 13:25:26.191771",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_xivy",
+  "column_break_tnea",
+  "amended_from",
+  "section_break_athc",
+  "posting_date",
+  "employee",
+  "employee_name",
+  "default_account",
+  "column_break_tljf",
+  "company",
+  "purchase_loan_request",
+  "loan_amount",
+  "outstanding_amount",
+  "section_break_xime",
+  "purchase_loan_repayment_invoices",
+  "total_invoices",
+  "section_break_ffav",
+  "loan_repayment_other_expenses",
+  "total_other_expenses",
+  "section_break_taia",
+  "total_repayment_amount"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_xivy",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_tnea",
+   "fieldtype": "Column Break",
+   "hidden": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Purchase Loan Repayment",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "section_break_athc",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Data",
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_filter": 1,
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "label": "Employee Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "default_account",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Default Account",
+   "no_copy": 1,
+   "options": "Account",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_tljf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "purchase_loan_request",
+   "fieldtype": "Link",
+   "label": "Purchase Loan Request",
+   "options": "Purchase Loan Request",
+   "reqd": 1
+  },
+  {
+   "fieldname": "loan_amount",
+   "fieldtype": "Float",
+   "label": "Loan Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "outstanding_amount",
+   "fieldtype": "Float",
+   "label": "Outstanding Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_xime",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "purchase_loan_repayment_invoices",
+   "fieldtype": "Table",
+   "label": "Purchase Loan Repayment Invoices",
+   "no_copy": 1,
+   "options": "Purchase Loan Repayment Invoices",
+   "read_only_depends_on": "eval:doc.docstatus ==1"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "total_invoices",
+   "fieldtype": "Float",
+   "label": "Total Invoices",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_ffav",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "loan_repayment_other_expenses",
+   "fieldtype": "Table",
+   "label": "Loan Repayment Other Expenses",
+   "no_copy": 1,
+   "options": "Loan Repayment Other Expenses",
+   "read_only_depends_on": "eval:doc.docstatus ==1"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "total_other_expenses",
+   "fieldtype": "Float",
+   "label": "Total Other Expenses",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_taia",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "total_repayment_amount",
+   "fieldtype": "Float",
+   "label": "Total Repayment Amount",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2024-11-26 18:10:46.526228",
+ "modified_by": "Administrator",
+ "module": "Purchase Loans",
+ "name": "Purchase Loan Repayment",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -8,6 +8,17 @@ app_license = "mit"
 # Apps
 # ------------------
 
+fixtures = [
+    {"dt": "Custom Field"},
+    {"dt": "Property Setter"}
+    ]
+
+doc_events = {
+    "Journal Entry": {
+        "on_cancel": "purchase_loans.purchase_loans.tasks.update_purchase_loan_request_on_cancel"
+    }
+}
+
 # required_apps = []
 
 # Each item in the list will be shown as an app in the apps page
