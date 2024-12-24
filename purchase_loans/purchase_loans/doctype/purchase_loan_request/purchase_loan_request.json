@@ -127,7 +127,7 @@
    "default": "0",
    "fieldname": "paid_amount_from_request",
    "fieldtype": "Float",
-   "label": "Paid Amount From Request",
+   "label": "Paid Amount",
    "no_copy": 1,
    "read_only": 1
   },
@@ -137,7 +137,7 @@
    "default": "0",
    "fieldname": "outstanding_amount_from_request",
    "fieldtype": "Float",
-   "label": "Outstanding Amount From Request",
+   "label": "Outstanding Amount",
    "no_copy": 1,
    "read_only": 1
   },
@@ -161,7 +161,7 @@
    "default": "0",
    "fieldname": "outstanding_amount_from_repayment",
    "fieldtype": "Float",
-   "label": "Outstanding Amount From Repayment",
+   "label": "Outstanding Amount",
    "no_copy": 1,
    "read_only": 1
   },
@@ -196,7 +196,7 @@
    "link_fieldname": "purchase_loan_request"
   }
  ],
- "modified": "2024-12-24 19:28:15.537713",
+ "modified": "2024-12-24 19:42:20.690621",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Request",

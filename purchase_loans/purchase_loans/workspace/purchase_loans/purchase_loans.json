@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"vKn1SPyutR\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Purchase Loans</span>\",\"col\":12}},{\"id\":\"g9CiEjakwT\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Purchase Loan Request\",\"col\":3}},{\"id\":\"luSxyH16HP\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Purchase Loan Repayment\",\"col\":3}},{\"id\":\"aoLT50cwwY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Journal Entry\",\"col\":3}},{\"id\":\"J01mFBqsK9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"General Ledger\",\"col\":3}}]",
+ "content": "[{\"id\":\"vKn1SPyutR\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Purchase Loans</span>\",\"col\":12}},{\"id\":\"g9CiEjakwT\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Purchase Loan Request\",\"col\":3}},{\"id\":\"luSxyH16HP\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Purchase Loan Repayment\",\"col\":3}},{\"id\":\"aoLT50cwwY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Journal Entry\",\"col\":3}},{\"id\":\"J01mFBqsK9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"General Ledger\",\"col\":3}},{\"id\":\"nC8bYgU8nG\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Purchase Loan Report\",\"col\":3}}]",
  "creation": "2024-11-07 13:21:59.394987",
  "custom_blocks": [],
  "docstatus": 0,
@@ -13,7 +13,7 @@
  "is_hidden": 0,
  "label": "Purchase Loans",
  "links": [],
- "modified": "2024-11-26 18:11:18.404177",
+ "modified": "2024-12-24 19:48:28.201169",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loans",
@@ -25,6 +25,13 @@
  "roles": [],
  "sequence_id": 1.0,
  "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Purchase Loan Report",
+   "link_to": "Purchase Loan Report",
+   "type": "Report"
+  },
   {
    "color": "Grey",
    "doc_view": "List",
