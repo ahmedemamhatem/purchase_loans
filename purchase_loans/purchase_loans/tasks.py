@@ -27,16 +27,19 @@ def update_purchase_loan_request(purchase_loan_request_name):
         WHERE purchase_loan_request = %s
     """, (purchase_loan_request_name), as_dict=True)[0]
 
-    total_paid = ledger_totals.get('total_paid', 0)
-    total_repaid = ledger_totals.get('total_repaid', 0)
+    # Ensure totals default to 0 if None
+    total_paid = ledger_totals.get('total_paid') or 0
+    total_repaid = ledger_totals.get('total_repaid') or 0
+
+    # Calculate overpaid amount
     overpaid_amount = 0.0
-    # Calculate outstanding and overpaid amounts
     if total_repaid > request_amount:
-        overpaid_amount = total_repaid - total_paid
+        overpaid_amount = max(total_repaid - total_paid, 0)
 
+    # Calculate outstanding amounts
     outstanding_from_repayment = max(total_paid - total_repaid, 0)
-
     outstanding_from_request = max(request_amount - total_paid, 0)
+    overpaid_payment_amount = max(total_paid - request_amount, 0)
 
     # Update the Purchase Loan Request document with calculated values
     frappe.db.set_value("Purchase Loan Request", purchase_loan_request_name, {
@@ -44,8 +47,10 @@ def update_purchase_loan_request(purchase_loan_request_name):
         "repaid_amount": total_repaid,
         "outstanding_amount_from_request": outstanding_from_request,
         "outstanding_amount_from_repayment": outstanding_from_repayment,
+        "overpaid_payment_amount": overpaid_payment_amount,
         "overpaid_repayment_amount": overpaid_amount
     })
+    loan_request_doc.reload()
 
 @frappe.whitelist()
 def cancel_purchase_loan_ledger(doc):

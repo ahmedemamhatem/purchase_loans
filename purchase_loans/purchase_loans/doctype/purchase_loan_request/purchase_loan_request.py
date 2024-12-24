@@ -3,21 +3,28 @@ from frappe import throw, _
 from frappe.model.document import Document
 from frappe.utils import now
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
-
+from purchase_loans.purchase_loans.tasks import update_purchase_loan_request
 class PurchaseLoanRequest(Document):
     """
     Represents a request for a purchase loan. This class includes functionality to 
     validate the loan request, check outstanding amounts, and update the loan request 
     after payments and repayments.
     """
+    def on_submit(self):
+        """
+        Called when the Purchase Loan Request document is submitted. This method updates
+        the Purchase Loan Request with the latest aggregate values from the ledger by 
+        invoking the `update_purchase_loan_request` function.
+        """
+
+        update_purchase_loan_request(self.name)
+        
     def validate(self):
         """
         Validates the Purchase Loan Request document by calculating the outstanding 
         amounts and ensuring the necessary configurations are in place for processing 
         loan payments.
         """
-
-        
         # Fetch the purchase_loan_account from the Company doctype
         self._fetch_company_configuration()
         
@@ -39,7 +46,6 @@ class PurchaseLoanRequest(Document):
             frappe.throw(_("Purchase Loan Account not set in the Company for {}").format(self.company))
 
 
-
 @frappe.whitelist()
 def pay_to_employee(loan_request, company, employee, mode_of_payment, payment_amount, payment_date=None):
     """
@@ -56,7 +62,14 @@ def pay_to_employee(loan_request, company, employee, mode_of_payment, payment_am
     payment_amount = _validate_payment_amount(payment_amount)
 
     purchase_loan_request_doc = frappe.get_doc("Purchase Loan Request", loan_request)
+    company_record = frappe.get_doc("Company", purchase_loan_request_doc.company)
+    custom_allow_payment_beyond_loan_amount = company_record.custom_allow_payment_beyond_loan_amount
 
+    if custom_allow_payment_beyond_loan_amount == "No" :
+        if  purchase_loan_request_doc.overpaid_repayment_amount > 0 and payment_amount > purchase_loan_request_doc.overpaid_repayment_amount:
+            frappe.throw(_("Payment amount cannot exceed the outstanding loan amount."))
+        elif  purchase_loan_request_doc.outstanding_amount_from_request > 0 and payment_amount > purchase_loan_request_doc.outstanding_amount_from_request:
+            frappe.throw(_("Payment amount cannot exceed the outstanding loan amount."))
 
     # Ensure mode of payment is provided
     _validate_mode_of_payment(mode_of_payment)
@@ -78,24 +91,22 @@ def create_repay_cash(loan_request, company, employee, mode_of_payment, payment_
     Create a journal entry for repaying cash, update the Purchase Loan Request, and 
     return the repaid cash amount.
     """
-    _check_user_permissions()
-
-    # Set default payment date if not provided
     payment_date = payment_date or now()
-    
-    # Validate the repay amount
     payment_amount = _validate_payment_amount(payment_amount)
-    
     purchase_loan_request = frappe.get_doc("Purchase Loan Request", loan_request)
+    company_record = frappe.get_doc("Company", purchase_loan_request.company)
 
+    if company_record.custom_allow_repayment_beyond_loan_amount == "No" :
+        if payment_amount > purchase_loan_request.outstanding_amount_from_repayment:
+            frappe.throw(_("Repayment amount cannot exceed the outstanding loan amount."))
 
-    # Get account IDs for repayment
+    _validate_mode_of_payment(mode_of_payment)
+
     from_account, to_account = _get_account_ids(mode_of_payment, company)
+    journal_entry = _create_journal_entry(
+        purchase_loan_request, payment_amount, company, employee, from_account, to_account, payment_date, is_repayment=True
+    )
 
-    # Create journal entry for repayment
-    journal_entry = _create_journal_entry(purchase_loan_request, payment_amount, company, employee, from_account, to_account, payment_date, is_repayment=True)
-    
-    
     return {
         "repaid_cash_amount": payment_amount,
         "message": _("Repayment of {} successfully processed.").format(payment_amount)

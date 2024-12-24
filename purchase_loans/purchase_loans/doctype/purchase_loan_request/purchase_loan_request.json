@@ -13,10 +13,11 @@
   "employee",
   "employee_name",
   "default_account",
-  "column_break_fdpw",
-  "company",
   "posting_date",
+  "company",
+  "column_break_fdpw",
   "request_amount",
+  "overpaid_payment_amount",
   "overpaid_repayment_amount",
   "section_break_bwxr",
   "paid_amount_from_request",
@@ -178,9 +179,17 @@
   {
    "allow_on_submit": 1,
    "bold": 1,
+   "depends_on": "eval:doc.overpaid_repayment_amount >0",
    "fieldname": "overpaid_repayment_amount",
    "fieldtype": "Float",
    "label": "Overpaid Repayment Amount",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.overpaid_payment_amount >0",
+   "fieldname": "overpaid_payment_amount",
+   "fieldtype": "Float",
+   "label": "Overpaid Payment Amount",
    "read_only": 1
   }
  ],
@@ -196,7 +205,7 @@
    "link_fieldname": "purchase_loan_request"
   }
  ],
- "modified": "2024-12-24 19:42:20.690621",
+ "modified": "2024-12-24 23:41:34.751217",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Request",
