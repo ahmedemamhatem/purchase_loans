@@ -16,18 +16,11 @@ class PurchaseLoanRequest(Document):
         amounts and ensuring the necessary configurations are in place for processing 
         loan payments.
         """
-        # Fetch employee and calculate outstanding amounts
-        self._calculate_outstanding_amounts()
+
         
         # Fetch the purchase_loan_account from the Company doctype
         self._fetch_company_configuration()
         
-    def _calculate_outstanding_amounts(self):
-        """
-        Calculates outstanding amounts based on request, paid, and repaid amounts.
-        """
-        self.outstanding_amount_from_request = self.request_amount - self.paid_amount_from_request
-        self.outstanding_amount_from_repayment = self.paid_amount_from_request - self.repaid_amount
 
     def _fetch_company_configuration(self):
         """
@@ -44,6 +37,8 @@ class PurchaseLoanRequest(Document):
             self.default_account = purchase_loan_account
         else:
             frappe.throw(_("Purchase Loan Account not set in the Company for {}").format(self.company))
+
+
 
 @frappe.whitelist()
 def pay_to_employee(loan_request, company, employee, mode_of_payment, payment_amount, payment_date=None):
@@ -62,15 +57,6 @@ def pay_to_employee(loan_request, company, employee, mode_of_payment, payment_am
 
     purchase_loan_request_doc = frappe.get_doc("Purchase Loan Request", loan_request)
 
-    # Ensure outstanding balance is not exceeded
-    if purchase_loan_request_doc.outstanding_amount_from_request - payment_amount < 0:
-        frappe.throw(_("The payment amount exceeds the outstanding balance."))
-
-    if purchase_loan_request_doc.outstanding_amount_from_request <= 0:
-        frappe.throw(_("The outstanding amount is already paid in full."))
-
-    if purchase_loan_request_doc.paid_amount_from_request > purchase_loan_request_doc.request_amount:
-        frappe.throw(_("The outstanding amount is already paid in full."))
 
     # Ensure mode of payment is provided
     _validate_mode_of_payment(mode_of_payment)
@@ -80,9 +66,6 @@ def pay_to_employee(loan_request, company, employee, mode_of_payment, payment_am
 
     # Create journal entry
     journal_entry = _create_journal_entry(purchase_loan_request_doc, payment_amount, company, employee, from_account_id, to_account_id, payment_date)
-    
-    # Update loan request and save
-    _update_purchase_loan_request(purchase_loan_request_doc, payment_amount)
     
     return {
         "Paid_amount": payment_amount,
@@ -105,10 +88,6 @@ def create_repay_cash(loan_request, company, employee, mode_of_payment, payment_
     
     purchase_loan_request = frappe.get_doc("Purchase Loan Request", loan_request)
 
-    # Ensure repay amount does not exceed outstanding balance
-    if payment_amount > purchase_loan_request.outstanding_amount_from_repayment:
-        frappe.throw(_("Repay amount cannot exceed the outstanding amount of {}.")
-                     .format(purchase_loan_request.outstanding_amount_from_repayment))
 
     # Get account IDs for repayment
     from_account, to_account = _get_account_ids(mode_of_payment, company)
@@ -116,8 +95,6 @@ def create_repay_cash(loan_request, company, employee, mode_of_payment, payment_
     # Create journal entry for repayment
     journal_entry = _create_journal_entry(purchase_loan_request, payment_amount, company, employee, from_account, to_account, payment_date, is_repayment=True)
     
-    # Update loan request and save
-    _update_purchase_loan_request(purchase_loan_request, payment_amount, is_repayment=True)
     
     return {
         "repaid_cash_amount": payment_amount,
@@ -195,16 +172,4 @@ def _create_journal_entry(purchase_loan_request_doc, payment_amount, company, em
     journal_entry.submit()
     return journal_entry
 
-def _update_purchase_loan_request(purchase_loan_request_doc, payment_amount, is_repayment=False):
-    """
-    Updates the purchase loan request with paid or repaid amounts.
-    """
-    if is_repayment:
-        purchase_loan_request_doc.repaid_amount += payment_amount
-        purchase_loan_request_doc.outstanding_amount_from_repayment = purchase_loan_request_doc.paid_amount_from_request - purchase_loan_request_doc.repaid_amount
-    else:
-        purchase_loan_request_doc.paid_amount_from_request += payment_amount
-        purchase_loan_request_doc.outstanding_amount_from_repayment = purchase_loan_request_doc.paid_amount_from_request - purchase_loan_request_doc.repaid_amount
-        purchase_loan_request_doc.outstanding_amount_from_request = purchase_loan_request_doc.request_amount - purchase_loan_request_doc.paid_amount_from_request
 
-    purchase_loan_request_doc.save()

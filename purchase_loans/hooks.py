@@ -15,7 +15,8 @@ fixtures = [
 
 doc_events = {
     "Journal Entry": {
-        "on_cancel": "purchase_loans.purchase_loans.tasks.update_purchase_loan_request_on_cancel"
+        "on_cancel": "purchase_loans.purchase_loans.tasks.update_purchase_loan_request_on_cancel",
+        "on_submit": "purchase_loans.purchase_loans.tasks.update_purchase_loan_request_on_submit"
     }
 }
 

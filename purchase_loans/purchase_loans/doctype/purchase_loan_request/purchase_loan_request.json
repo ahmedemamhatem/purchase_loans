@@ -17,6 +17,7 @@
   "company",
   "posting_date",
   "request_amount",
+  "overpaid_repayment_amount",
   "section_break_bwxr",
   "paid_amount_from_request",
   "outstanding_amount_from_request",
@@ -122,6 +123,7 @@
   },
   {
    "allow_on_submit": 1,
+   "bold": 1,
    "default": "0",
    "fieldname": "paid_amount_from_request",
    "fieldtype": "Float",
@@ -131,6 +133,7 @@
   },
   {
    "allow_on_submit": 1,
+   "bold": 1,
    "default": "0",
    "fieldname": "outstanding_amount_from_request",
    "fieldtype": "Float",
@@ -144,6 +147,7 @@
   },
   {
    "allow_on_submit": 1,
+   "bold": 1,
    "default": "0",
    "fieldname": "repaid_amount",
    "fieldtype": "Float",
@@ -153,6 +157,7 @@
   },
   {
    "allow_on_submit": 1,
+   "bold": 1,
    "default": "0",
    "fieldname": "outstanding_amount_from_repayment",
    "fieldtype": "Float",
@@ -169,6 +174,14 @@
    "fieldtype": "Text Editor",
    "label": "Purchase Items Details",
    "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "bold": 1,
+   "fieldname": "overpaid_repayment_amount",
+   "fieldtype": "Float",
+   "label": "Overpaid Repayment Amount",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -183,7 +196,7 @@
    "link_fieldname": "purchase_loan_request"
   }
  ],
- "modified": "2024-11-26 19:24:56.924448",
+ "modified": "2024-12-24 19:28:15.537713",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Request",

@@ -16,8 +16,7 @@ class PurchaseLoanRepayment(Document):
 		if self.purchase_loan_repayment_invoices:
 			self._create_journal_entry_for_invoices()
 
-		# Update the Purchase Loan Request with the repaid amount and outstanding amount
-		self._update_purchase_loan_request()
+
 
 	def _create_journal_entry_for_expenses(self):
 		"""Creates a journal entry for other expenses in the loan repayment."""
@@ -70,6 +69,7 @@ class PurchaseLoanRepayment(Document):
 				"custom_purchase_loan_request": self.purchase_loan_request,
 				"custom_purchase_loan_repayment": self.name,
 				"company": self.company,
+				"custom_row_name": row.name,
 				"user_remark": _("Repayment made for Purchase Loan Request: {}").format(self.purchase_loan_request),
 				"accounts": [
 					{
@@ -108,13 +108,6 @@ class PurchaseLoanRepayment(Document):
 		# Update the loan repayment document to reflect the changes
 		self.db_update()
 
-	def _update_purchase_loan_request(self):
-		"""Updates the Purchase Loan Request with the repaid amount and outstanding amount."""
-		purchase_loan_request = frappe.get_doc("Purchase Loan Request", self.purchase_loan_request)
-		purchase_loan_request.repaid_amount += self.total_repayment_amount
-		purchase_loan_request.outstanding_amount_from_repayment = purchase_loan_request.paid_amount_from_request - purchase_loan_request.repaid_amount
-		purchase_loan_request.save()
-		purchase_loan_request.reload()
 
 	def validate(self):
 		"""Validates duplicate entries and repayment constraints."""
@@ -146,8 +139,15 @@ class PurchaseLoanRepayment(Document):
 
 	def _validate_repayment_amount(self):
 		"""Ensure repayment does not exceed outstanding loan amount."""
+		
 		if self.total_repayment_amount <= 0:
 			frappe.throw(_("Repayment amount must be greater than zero."))
 
-		if self.total_repayment_amount > self.outstanding_amount:
+		# Fetch company record and check the custom setting
+		company_record = frappe.get_doc("Company", self.company)
+		custom_allow_repayment_beyond_loan_amount = company_record.custom_allow_repayment_beyond_loan_amount
+
+		# Check if repayment exceeds outstanding amount and handle based on company setting
+		if self.total_repayment_amount > self.outstanding_amount and custom_allow_repayment_beyond_loan_amount == "No":
 			frappe.throw(_("Repayment amount cannot exceed the outstanding loan amount."))
+

@@ -1,11 +1,31 @@
+
+frappe.ui.form.on("Purchase Loan Request", {
+    onload: function(frm) {
+        // Check if the document is not new (not local)
+        if (!frm.is_new()) {
+            // Call the server-side function to update the request
+            frappe.call({
+                method: "purchase_loans.purchase_loans.tasks.update_purchase_loan_request",
+                args: {
+                    purchase_loan_request_name: frm.doc.name
+                },
+                callback: function(response) {
+                    
+                }
+            });
+        }
+    }
+});
+
+
 frappe.ui.form.on("Purchase Loan Request", {
     refresh(frm) {
         // Check if the document is submitted (docstatus is 1)
         if (frm.doc.docstatus === 1) {
 
             // Display Payment button if outstanding_amount_from_request > 0
-            if (frm.doc.outstanding_amount_from_request > 0) {
-                frm.add_custom_button(__('Payment'), function() {
+            if (frm.doc.outstanding_amount_from_request > 0 || frm.doc.overpaid_repayment_amount > 0) {
+                frm.add_custom_button(__('Pay To Employee'), function() {
                     show_payment_dialog(frm);
                 });
             }
@@ -44,7 +64,7 @@ function show_payment_dialog(frm) {
             fieldname: 'payment_amount',
             fieldtype: 'Float', // Use Float for numeric input
             reqd: 1,
-            default: frm.doc.outstanding_amount_from_request // Default payment amount as outstanding amount
+            default: frm.doc.outstanding_amount_from_request + frm.doc.overpaid_repayment_amount // Default payment amount as outstanding amount
         },
         {
             label: 'Payment Date',
