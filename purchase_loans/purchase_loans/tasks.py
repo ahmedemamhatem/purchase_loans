@@ -1,6 +1,8 @@
 import frappe
 from frappe import _
 
+
+
 @frappe.whitelist()
 def update_purchase_loan_request(purchase_loan_request_name):
     """
@@ -16,7 +18,17 @@ def update_purchase_loan_request(purchase_loan_request_name):
         return
 
     loan_request_doc = frappe.get_doc("Purchase Loan Request", purchase_loan_request_name)
-    request_amount = loan_request_doc.request_amount
+
+    company_currency = frappe.db.get_value(
+        "Company", filters={"name": loan_request_doc.company}, fieldname="default_currency"
+    )
+    
+    if company_currency != loan_request_doc.currency:
+        exchange_rate = loan_request_doc.exchange_rate
+    else:
+        exchange_rate = 1.0
+
+    request_amount = loan_request_doc.request_amount * exchange_rate
 
     # Aggregate paid and repayment amounts from the ledger
     ledger_totals = frappe.db.sql("""
@@ -41,14 +53,17 @@ def update_purchase_loan_request(purchase_loan_request_name):
     outstanding_from_request = max(request_amount - total_paid, 0)
     overpaid_payment_amount = max(total_paid - request_amount, 0)
 
+    
+    
+
     # Update the Purchase Loan Request document with calculated values
     frappe.db.set_value("Purchase Loan Request", purchase_loan_request_name, {
-        "paid_amount_from_request": total_paid,
-        "repaid_amount": total_repaid,
-        "outstanding_amount_from_request": outstanding_from_request,
-        "outstanding_amount_from_repayment": outstanding_from_repayment,
-        "overpaid_payment_amount": overpaid_payment_amount,
-        "overpaid_repayment_amount": overpaid_amount
+        "paid_amount_from_request": total_paid / exchange_rate,
+        "repaid_amount": total_repaid / exchange_rate,
+        "outstanding_amount_from_request": outstanding_from_request / exchange_rate,
+        "outstanding_amount_from_repayment": outstanding_from_repayment / exchange_rate,
+        "overpaid_payment_amount": overpaid_payment_amount / exchange_rate,
+        "overpaid_repayment_amount": overpaid_amount / exchange_rate
     })
     loan_request_doc.reload()
 

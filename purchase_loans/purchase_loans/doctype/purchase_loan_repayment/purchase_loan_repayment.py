@@ -38,6 +38,13 @@ class PurchaseLoanRepayment(Document):
 
     def _create_journal_entry_for_expenses(self):
         """Creates a journal entry for other expenses in the loan repayment."""
+
+        purchase_loan_request_doc = frappe.get_doc("Purchase Loan Request", self.purchase_loan_request)
+        currency = purchase_loan_request_doc.currency
+        exchange_rate = purchase_loan_request_doc.exchange_rate
+
+        payment_amount_in_currency = self.total_other_expenses * exchange_rate
+
         journal_entry = frappe.get_doc({
             "doctype": "Journal Entry",
             "voucher_type": "Purchase Loan Settlement Expense",
@@ -45,13 +52,14 @@ class PurchaseLoanRepayment(Document):
             "custom_purchase_loan_request": self.purchase_loan_request,
             "custom_purchase_loan_repayment": self.name,
             "company": self.company,
+            "multi_currency": 1,
             "user_remark": _("Repayment made for Purchase Loan Request: {}").format(self.purchase_loan_request),
             "accounts": [
                 {
                     "account": self.default_account,
                     "party_type": "Employee",
                     "party": self.employee,
-                    "credit_in_account_currency": self.total_other_expenses
+                    "credit_in_account_currency": payment_amount_in_currency
                 }
             ]
         })
@@ -60,6 +68,9 @@ class PurchaseLoanRepayment(Document):
         for row in self.loan_repayment_other_expenses:
             journal_entry.append("accounts", {
                 "account": row.account,
+                "account_currency": currency,
+                "exchange_rate": exchange_rate,
+                "debit": row.amount * exchange_rate,
                 "debit_in_account_currency": row.amount
             })
 
@@ -74,10 +85,19 @@ class PurchaseLoanRepayment(Document):
         # List to hold all journal entries to be created in one batch
         journal_entries = []
 
+        purchase_loan_request_doc = frappe.get_doc("Purchase Loan Request", self.purchase_loan_request)
+        currency = purchase_loan_request_doc.currency
+        exchange_rate = purchase_loan_request_doc.exchange_rate
+        
         # Loop through each row in purchase_loan_repayment_invoices to create individual journal entries
         for row in self.purchase_loan_repayment_invoices:
+            party_account = row.party_account
+            party_currency = row.party_currency
             # Fetch the purchase invoice document to get `credit_to` and `outstanding_amount`
             purchase_invoice = frappe.get_doc("Purchase Invoice", row.purchase_invoice)
+            purchase_invoice_currency = purchase_invoice.currency
+            purchase_invoice_exchange_rate = purchase_invoice.exchange_rate
+
 
             # Create a journal entry for the current invoice
             journal_entry = frappe.get_doc({
@@ -87,6 +107,7 @@ class PurchaseLoanRepayment(Document):
                 "custom_purchase_loan_request": self.purchase_loan_request,
                 "custom_purchase_loan_repayment": self.name,
                 "company": self.company,
+                "multi_currency": 1,
                 "custom_row_name": row.name,
                 "user_remark": _("Repayment made for Purchase Loan Request: {}").format(self.purchase_loan_request),
                 "accounts": [
@@ -102,6 +123,7 @@ class PurchaseLoanRepayment(Document):
                         "account": purchase_invoice.credit_to,
                         "party_type": "Supplier",
                         "party": purchase_invoice.supplier,
+                        "account_currency": party_currency,
                         "debit_in_account_currency": purchase_invoice.outstanding_amount,
                         "against_voucher_type": "Purchase Invoice",
                         "against_voucher": row.purchase_invoice,
@@ -131,6 +153,7 @@ class PurchaseLoanRepayment(Document):
         """Validates duplicate entries and repayment constraints."""
         self._validate_duplicate_entries()
         self._sum_outstanding_and_expense_amounts()
+        self._validate_currency()
         
 
     def _validate_duplicate_entries(self):
@@ -168,4 +191,17 @@ class PurchaseLoanRepayment(Document):
         # Check if repayment exceeds outstanding amount and handle based on company setting
         if self.total_repayment_amount > self.outstanding_amount and custom_allow_repayment_beyond_loan_amount == "No":
             frappe.throw(_("Repayment amount cannot exceed the outstanding loan amount."))
+
+    def _validate_currency(self):
+        currency = self.loan_currency
+        if self.loan_repayment_other_expenses:
+            for row in self.loan_repayment_other_expenses:
+                if row.currency != currency:
+                    frappe.throw(_("Currency ({}) does not match the loan request currency ({})").format(row.currency, currency))
+            
+        if self.purchase_loan_repayment_invoices:
+            for row in self.purchase_loan_repayment_invoices:
+                if row.currency != currency:
+                    frappe.throw(_("Currency ({}) does not match the loan request currency ({})").format(row.currency, currency))
+            
 

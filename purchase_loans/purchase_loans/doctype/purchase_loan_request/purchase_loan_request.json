@@ -17,6 +17,8 @@
   "company",
   "column_break_fdpw",
   "request_amount",
+  "currency",
+  "exchange_rate",
   "overpaid_payment_amount",
   "overpaid_repayment_amount",
   "section_break_bwxr",
@@ -191,6 +193,19 @@
    "fieldtype": "Float",
    "label": "Overpaid Payment Amount",
    "read_only": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "exchange_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -205,7 +220,7 @@
    "link_fieldname": "purchase_loan_request"
   }
  ],
- "modified": "2024-12-24 23:41:34.751217",
+ "modified": "2024-12-25 14:34:28.984641",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Request",

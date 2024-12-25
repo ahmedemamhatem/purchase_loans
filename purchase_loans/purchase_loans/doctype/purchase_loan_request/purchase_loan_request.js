@@ -1,4 +1,5 @@
 
+
 frappe.ui.form.on("Purchase Loan Request", {
     onload: function(frm) {
         // Check if the document is not new (not local)

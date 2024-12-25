@@ -4,6 +4,8 @@ from frappe.model.document import Document
 from frappe.utils import now
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 from purchase_loans.purchase_loans.tasks import update_purchase_loan_request
+from erpnext.setup.utils import get_exchange_rate
+
 class PurchaseLoanRequest(Document):
     """
     Represents a request for a purchase loan. This class includes functionality to 
@@ -19,6 +21,10 @@ class PurchaseLoanRequest(Document):
 
         update_purchase_loan_request(self.name)
         
+    def after_insert(self):
+        if not self.exchange_rate or self.exchange_rate in {0, 1}:
+            self.exchange_rate = get_conversion_rate(self)
+
     def validate(self):
         """
         Validates the Purchase Loan Request document by calculating the outstanding 
@@ -27,6 +33,10 @@ class PurchaseLoanRequest(Document):
         """
         # Fetch the purchase_loan_account from the Company doctype
         self._fetch_company_configuration()
+
+        currency = self.has_value_changed("currency")
+        if currency:
+            self.exchange_rate = get_conversion_rate(self)
         
 
     def _fetch_company_configuration(self):
@@ -44,6 +54,26 @@ class PurchaseLoanRequest(Document):
             self.default_account = purchase_loan_account
         else:
             frappe.throw(_("Purchase Loan Account not set in the Company for {}").format(self.company))
+
+
+
+
+
+
+@frappe.whitelist()
+def get_conversion_rate(self):
+    company = self.company 
+    currency = self.currency
+    posting_date = self.posting_date
+    # Fetch the company currency
+    company_currency = frappe.db.get_value(
+        "Company", filters={"name": company}, fieldname="default_currency"
+    )
+    
+    # Fetch the exchange rate
+    conversion_rate = get_exchange_rate(currency, company_currency, transaction_date=posting_date)
+    
+    return conversion_rate or 1
 
 
 @frappe.whitelist()
@@ -65,6 +95,9 @@ def pay_to_employee(loan_request, company, employee, mode_of_payment, payment_am
     company_record = frappe.get_doc("Company", purchase_loan_request_doc.company)
     custom_allow_payment_beyond_loan_amount = company_record.custom_allow_payment_beyond_loan_amount
 
+    currency = purchase_loan_request_doc.currency 
+
+    # Ensure the payment amount is within the outstanding balance
     if custom_allow_payment_beyond_loan_amount == "No" :
         if  purchase_loan_request_doc.overpaid_repayment_amount > 0 and payment_amount > purchase_loan_request_doc.overpaid_repayment_amount:
             frappe.throw(_("Payment amount cannot exceed the outstanding loan amount."))
@@ -76,7 +109,7 @@ def pay_to_employee(loan_request, company, employee, mode_of_payment, payment_am
 
     # Perform the payment transaction
     from_account_id, to_account_id = _get_account_ids(mode_of_payment, purchase_loan_request_doc.company)
-
+    
     # Create journal entry
     journal_entry = _create_journal_entry(purchase_loan_request_doc, payment_amount, company, employee, from_account_id, to_account_id, payment_date)
     
@@ -103,6 +136,7 @@ def create_repay_cash(loan_request, company, employee, mode_of_payment, payment_
     _validate_mode_of_payment(mode_of_payment)
 
     from_account, to_account = _get_account_ids(mode_of_payment, company)
+    
     journal_entry = _create_journal_entry(
         purchase_loan_request, payment_amount, company, employee, from_account, to_account, payment_date, is_repayment=True
     )
@@ -154,6 +188,18 @@ def _create_journal_entry(purchase_loan_request_doc, payment_amount, company, em
     """
     Creates a journal entry for the payment or repayment.
     """
+
+    currency = purchase_loan_request_doc.currency
+    exchange_rate = purchase_loan_request_doc.exchange_rate
+
+    account_currency = frappe.db.get_value(
+        "Account", filters={"name": to_account}, fieldname="account_currency"
+    )
+    if account_currency and account_currency != currency:
+        frappe.throw(_("Account currency ({}) does not match the loan request currency ({})").format(account_currency, currency))
+
+    payment_amount_in_currency = payment_amount * exchange_rate
+    
     voucher_type = "Purchase Loan Repayment" if is_repayment else "Purchase Loan Payment"
     journal_entry = frappe.get_doc({
         "doctype": "Journal Entry",
@@ -161,11 +207,12 @@ def _create_journal_entry(purchase_loan_request_doc, payment_amount, company, em
         "posting_date": payment_date,
         "custom_purchase_loan_request": purchase_loan_request_doc.name,
         "company": company,
+        "multi_currency": 1,
         "user_remark": _("Repayment made for Purchase Loan Request: {}").format(purchase_loan_request_doc.name),
         "accounts": [
             {
                 "account": from_account,
-                "debit_in_account_currency" if is_repayment else "credit_in_account_currency": payment_amount,
+                "debit_in_account_currency" if is_repayment else "credit_in_account_currency": payment_amount_in_currency,
                 "reference_type": "Purchase Loan Request",  
                 "reference_name": purchase_loan_request_doc.name,
                 "party_type": "Employee",
@@ -173,7 +220,10 @@ def _create_journal_entry(purchase_loan_request_doc, payment_amount, company, em
             },
             {
                 "account": to_account,
+                "account_currency": currency,
+                "exchange_rate": exchange_rate,
                 "credit_in_account_currency" if is_repayment else "debit_in_account_currency": payment_amount,
+                "credit" if is_repayment else "debit": payment_amount_in_currency,
                 "reference_type": "Purchase Loan Request",  
                 "reference_name": purchase_loan_request_doc.name
             }
