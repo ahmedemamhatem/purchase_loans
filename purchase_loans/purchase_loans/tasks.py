@@ -93,7 +93,7 @@ def cancel_purchase_loan_ledger(doc):
         frappe.db.commit()
 
 @frappe.whitelist()
-def create_purchase_loan_ledger(doc):
+def create_purchase_loan_ledger(doc, ledger_amount):
     # Create a new Purchase Loan Ledger entry
     """
     Creates a new entry in the Purchase Loan Ledger based on the provided document.
@@ -109,7 +109,7 @@ def create_purchase_loan_ledger(doc):
 
     loan_request_doc = frappe.get_doc("Purchase Loan Request", doc.custom_purchase_loan_request)
     purchase_loan_payment_type = "Pay" if doc.voucher_type =="Purchase Loan Payment" else "RePay"
-    paid_amount = doc.total_debit or doc.total_credit
+    paid_amount = ledger_amount
     ledger_entry = frappe.get_doc({
         "doctype": "Purchase Loan Ledger",
         "purchase_loan_request": loan_request_doc.name,
@@ -131,7 +131,6 @@ def update_purchase_loan_request_on_submit(doc, method):
     Creates a new Purchase Loan Ledger entry and updates the Purchase Loan Request.
     """
     if doc.custom_purchase_loan_request:
-        create_purchase_loan_ledger(doc)
 
         update_purchase_loan_request(doc.custom_purchase_loan_request)
 
@@ -157,10 +156,19 @@ def update_purchase_loan_request_on_cancel(doc, method):
 
             if doc.voucher_type == "Purchase Loan Settlement Invoice":
                 # Adjust outstanding and repaid amounts
-                purchase_loan_repayment_invoices = frappe.get_doc("Purchase Loan Repayment Invoices", doc.custom_row_name)
-                if purchase_loan_repayment_invoices:
-                    purchase_invoice = purchase_loan_repayment_invoices.purchase_invoice
-                    outstanding_amount = purchase_loan_repayment_invoices.outstanding_amount
+                purchase_loan_repayment_invoice_name = frappe.db.get_value(
+                        "Purchase Loan Repayment Invoices",
+                        filters={"purchase_invoice": doc.custom_row_name},
+                        fieldname="name"
+                    )
+                if purchase_loan_repayment_invoice_name:
+                    # Fetch the document for further processing
+                    purchase_loan_repayment_invoice = frappe.get_doc(
+                        "Purchase Loan Repayment Invoices",
+                        purchase_loan_repayment_invoice_name
+                    )
+                    purchase_invoice = purchase_loan_repayment_invoice.purchase_invoice
+                    outstanding_amount = purchase_loan_repayment_invoice.outstanding_amount
                     # Update invoices to "Overdue" and reset outstanding amounts
                     frappe.db.set_value("Purchase Invoice", purchase_invoice, {
                         "status": "Overdue",
@@ -169,7 +177,7 @@ def update_purchase_loan_request_on_cancel(doc, method):
                     total_invoices -= outstanding_amount
                     purchase_loan_repayment.total_invoices = total_invoices
                     # Delete the row from Purchase Loan Repayment Invoices
-                    frappe.delete_doc("Purchase Loan Repayment Invoices", doc.custom_row_name, force=True)
+                    frappe.delete_doc("Purchase Loan Repayment Invoices", purchase_loan_repayment_invoice_name, force=True)
 
 
             elif doc.voucher_type == "Purchase Loan Settlement Expense":

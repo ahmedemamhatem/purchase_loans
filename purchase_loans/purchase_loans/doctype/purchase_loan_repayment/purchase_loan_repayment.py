@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from purchase_loans.purchase_loans.tasks import create_purchase_loan_ledger
 
 class PurchaseLoanRepayment(Document):
     def on_cancel(self):
@@ -44,7 +45,7 @@ class PurchaseLoanRepayment(Document):
         exchange_rate = purchase_loan_request_doc.exchange_rate
 
         payment_amount_in_currency = self.total_other_expenses * exchange_rate
-
+        ledger_amount = payment_amount_in_currency
         journal_entry = frappe.get_doc({
             "doctype": "Journal Entry",
             "voucher_type": "Purchase Loan Settlement Expense",
@@ -77,29 +78,58 @@ class PurchaseLoanRepayment(Document):
         # Insert and submit the journal entry in one go
         journal_entry.insert(ignore_permissions=True)
         journal_entry.submit()
-
+        create_purchase_loan_ledger(journal_entry, ledger_amount)
         self.db_update()
 
     def _create_journal_entry_for_invoices(self):
-        """Creates a journal entry for each invoice in the loan repayment and links each entry to a Purchase Invoice."""
-        # List to hold all journal entries to be created in one batch
+        """Creates journal entries for loan repayment invoices and handles exchange differences."""
+        # Initialize lists for journal entries
         journal_entries = []
+        exchange_difference_entries = []
 
+        # Fetch loan request details
         purchase_loan_request_doc = frappe.get_doc("Purchase Loan Request", self.purchase_loan_request)
         currency = purchase_loan_request_doc.currency
         exchange_rate = purchase_loan_request_doc.exchange_rate
-        
-        # Loop through each row in purchase_loan_repayment_invoices to create individual journal entries
+
+        company_currency = frappe.db.get_value(
+            "Company", filters={"name": purchase_loan_request_doc.company}, fieldname="default_currency"
+        )
+        exchange_gain_loss_account = frappe.db.get_value(
+            "Company", filters={"name": purchase_loan_request_doc.company}, fieldname="exchange_gain_loss_account"
+        )
+
         for row in self.purchase_loan_repayment_invoices:
+            # Fetch party and invoice details
             party_account = row.party_account
             party_currency = row.party_currency
-            # Fetch the purchase invoice document to get `credit_to` and `outstanding_amount`
             purchase_invoice = frappe.get_doc("Purchase Invoice", row.purchase_invoice)
             purchase_invoice_currency = purchase_invoice.currency
-            purchase_invoice_exchange_rate = purchase_invoice.exchange_rate
+            purchase_invoice_exchange_rate = purchase_invoice.conversion_rate
 
+            if party_currency != purchase_invoice_currency and party_currency == company_currency:
+                # Calculate exchange differences for this case
+                party_amount_in_currency = row.outstanding_amount / purchase_invoice_exchange_rate
+                amount_in_loan_currency = party_amount_in_currency * exchange_rate
+                exchange_difference = amount_in_loan_currency - row.outstanding_amount 
+                amount_in_company_currency = row.outstanding_amount
+                ledger_amount =  amount_in_company_currency - exchange_difference
+            elif party_currency == purchase_invoice_currency and party_currency != company_currency:
+                # Calculate exchange differences for another case
+                party_amount_in_currency = row.outstanding_amount
+                amount_in_loan_currency = row.outstanding_amount * exchange_rate
+                amount_in_company_currency = row.outstanding_amount * purchase_invoice_exchange_rate
+                exchange_difference = amount_in_loan_currency - amount_in_company_currency
+                ledger_amount =  amount_in_company_currency - exchange_difference
+            else:
+                # No exchange difference case
+                party_amount_in_currency = row.outstanding_amount
+                amount_in_loan_currency = row.outstanding_amount
+                exchange_difference = 0
+                amount_in_company_currency = row.outstanding_amount
+                ledger_amount =  amount_in_company_currency - exchange_difference
 
-            # Create a journal entry for the current invoice
+            # Create main journal entry
             journal_entry = frappe.get_doc({
                 "doctype": "Journal Entry",
                 "voucher_type": "Purchase Loan Settlement Invoice",
@@ -108,14 +138,14 @@ class PurchaseLoanRepayment(Document):
                 "custom_purchase_loan_repayment": self.name,
                 "company": self.company,
                 "multi_currency": 1,
-                "custom_row_name": row.name,
+                "custom_row_name": row.purchase_invoice,
                 "user_remark": _("Repayment made for Purchase Loan Request: {}").format(self.purchase_loan_request),
                 "accounts": [
                     {
                         "account": self.default_account,
                         "party_type": "Employee",
                         "party": self.employee,
-                        "credit_in_account_currency": purchase_invoice.outstanding_amount,
+                        "credit_in_account_currency": amount_in_company_currency,
                         "reference_type": "Purchase Loan Request",
                         "reference_name": self.purchase_loan_request
                     },
@@ -124,7 +154,9 @@ class PurchaseLoanRepayment(Document):
                         "party_type": "Supplier",
                         "party": purchase_invoice.supplier,
                         "account_currency": party_currency,
-                        "debit_in_account_currency": purchase_invoice.outstanding_amount,
+                        "exchange_rate": purchase_invoice_exchange_rate,
+                        "debit_in_account_currency": party_amount_in_currency,
+                        "debit": amount_in_company_currency,
                         "against_voucher_type": "Purchase Invoice",
                         "against_voucher": row.purchase_invoice,
                         "reference_type": "Purchase Loan Request",
@@ -132,21 +164,53 @@ class PurchaseLoanRepayment(Document):
                     }
                 ]
             })
-
-            # Add the journal entry to the list
             journal_entries.append(journal_entry)
 
-            # Set the outstanding amount to zero and mark the invoice as paid
+            # Handle exchange difference if present
+            if exchange_difference != 0:
+                exchange_difference_entry = frappe.get_doc({
+                    "doctype": "Journal Entry",
+                    "voucher_type": "Exchange Gain Or Loss",
+                    "posting_date": frappe.utils.nowdate(),
+                    "custom_purchase_loan_request": self.purchase_loan_request,
+                    "custom_purchase_loan_repayment": self.name,
+                    "company": self.company,
+                    "multi_currency": 1,
+                    "user_remark": _("Exchange Difference Adjustment for Purchase Loan Request: {}").format(self.purchase_loan_request),
+                    "accounts": [
+                        {
+                            "account": exchange_gain_loss_account,
+                            "debit_in_account_currency" if exchange_difference > 0 else "credit_in_account_currency": abs(exchange_difference),
+                            "reference_type": "Purchase Loan Request",
+                            "reference_name": self.purchase_loan_request
+                        },
+                        {
+                            "account": self.default_account,
+                            "credit_in_account_currency" if exchange_difference > 0 else "debit_in_account_currency": abs(exchange_difference),
+                            "reference_type": "Purchase Loan Request",
+                            "reference_name": self.purchase_loan_request
+                        }
+                    ]
+                })
+                exchange_difference_entries.append(exchange_difference_entry)
+
+            # Mark invoice as paid
             purchase_invoice.db_set("status", "Paid")
             purchase_invoice.db_set("outstanding_amount", 0)
 
-        # Insert and submit all journal entries in one go
+        # Insert and submit journal entries
         for journal_entry in journal_entries:
             journal_entry.insert(ignore_permissions=True)
             journal_entry.submit()
+            create_purchase_loan_ledger(journal_entry, ledger_amount)
 
-        # Update the loan repayment document to reflect the changes
+        for exchange_difference_entry in exchange_difference_entries:
+            exchange_difference_entry.insert(ignore_permissions=True)
+            exchange_difference_entry.submit()
+
+        # Update loan repayment document
         self.db_update()
+
 
 
     def validate(self):

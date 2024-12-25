@@ -3,7 +3,7 @@ from frappe import throw, _
 from frappe.model.document import Document
 from frappe.utils import now
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
-from purchase_loans.purchase_loans.tasks import update_purchase_loan_request
+from purchase_loans.purchase_loans.tasks import update_purchase_loan_request, create_purchase_loan_ledger
 from erpnext.setup.utils import get_exchange_rate
 
 class PurchaseLoanRequest(Document):
@@ -199,7 +199,7 @@ def _create_journal_entry(purchase_loan_request_doc, payment_amount, company, em
         frappe.throw(_("Account currency ({}) does not match the loan request currency ({})").format(account_currency, currency))
 
     payment_amount_in_currency = payment_amount * exchange_rate
-    
+    ledger_amount = payment_amount_in_currency
     voucher_type = "Purchase Loan Repayment" if is_repayment else "Purchase Loan Payment"
     journal_entry = frappe.get_doc({
         "doctype": "Journal Entry",
@@ -231,6 +231,7 @@ def _create_journal_entry(purchase_loan_request_doc, payment_amount, company, em
     })
     journal_entry.insert(ignore_permissions=True)
     journal_entry.submit()
+    create_purchase_loan_ledger(journal_entry, ledger_amount)
     return journal_entry
 
 
