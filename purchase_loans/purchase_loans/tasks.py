@@ -170,15 +170,13 @@ def update_purchase_loan_request_on_cancel(doc, method):
                     purchase_invoice = purchase_loan_repayment_invoice.purchase_invoice
                     outstanding_amount = purchase_loan_repayment_invoice.outstanding_amount
                     # Update invoices to "Overdue" and reset outstanding amounts
-                    frappe.db.set_value("Purchase Invoice", purchase_invoice, {
+                    frappe.db.set_value("Purchase Invoice", doc.custom_row_name, {
                         "status": "Overdue",
                         "outstanding_amount": outstanding_amount
                     })
                     total_invoices -= outstanding_amount
                     purchase_loan_repayment.total_invoices = total_invoices
-                    # Delete the row from Purchase Loan Repayment Invoices
-                    frappe.delete_doc("Purchase Loan Repayment Invoices", purchase_loan_repayment_invoice_name, force=True)
-
+                    
 
             elif doc.voucher_type == "Purchase Loan Settlement Expense":
                 # Sum and clear other expenses

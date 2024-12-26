@@ -92,12 +92,27 @@ class PurchaseLoanRepayment(Document):
         currency = purchase_loan_request_doc.currency
         exchange_rate = purchase_loan_request_doc.exchange_rate
 
+        # Fetch default_currency
         company_currency = frappe.db.get_value(
             "Company", filters={"name": purchase_loan_request_doc.company}, fieldname="default_currency"
         )
+        if not company_currency:
+            frappe.throw(
+                _("Default currency is not set for the company {0}. Please configure it in the Company settings.")
+                .format(purchase_loan_request_doc.company)
+            )
+
+        # Fetch exchange_gain_loss_account
         exchange_gain_loss_account = frappe.db.get_value(
-            "Company", filters={"name": purchase_loan_request_doc.company}, fieldname="exchange_gain_loss_account"
+            "Company", purchase_loan_request_doc.company, "exchange_gain_loss_account"
         )
+        if not exchange_gain_loss_account:
+            frappe.throw(
+                _("Exchange Gain or Loss Account is not set for the company {0}. Please configure it in the Company settings.")
+                .format(purchase_loan_request_doc.company)
+            )
+
+
 
         for row in self.purchase_loan_repayment_invoices:
             # Fetch party and invoice details
@@ -113,21 +128,21 @@ class PurchaseLoanRepayment(Document):
                 amount_in_loan_currency = party_amount_in_currency * exchange_rate
                 exchange_difference = amount_in_loan_currency - row.outstanding_amount 
                 amount_in_company_currency = row.outstanding_amount
-                ledger_amount =  amount_in_company_currency - exchange_difference
+                ledger_amount =  amount_in_loan_currency
             elif party_currency == purchase_invoice_currency and party_currency != company_currency:
                 # Calculate exchange differences for another case
                 party_amount_in_currency = row.outstanding_amount
                 amount_in_loan_currency = row.outstanding_amount * exchange_rate
                 amount_in_company_currency = row.outstanding_amount * purchase_invoice_exchange_rate
                 exchange_difference = amount_in_loan_currency - amount_in_company_currency
-                ledger_amount =  amount_in_company_currency - exchange_difference
+                ledger_amount =  amount_in_loan_currency
             else:
                 # No exchange difference case
                 party_amount_in_currency = row.outstanding_amount
                 amount_in_loan_currency = row.outstanding_amount
                 exchange_difference = 0
                 amount_in_company_currency = row.outstanding_amount
-                ledger_amount =  amount_in_company_currency - exchange_difference
+                ledger_amount =  row.outstanding_amount
 
             # Create main journal entry
             journal_entry = frappe.get_doc({
@@ -146,6 +161,7 @@ class PurchaseLoanRepayment(Document):
                         "party_type": "Employee",
                         "party": self.employee,
                         "credit_in_account_currency": amount_in_company_currency,
+                        "credit": amount_in_company_currency,
                         "reference_type": "Purchase Loan Request",
                         "reference_name": self.purchase_loan_request
                     },
@@ -181,12 +197,14 @@ class PurchaseLoanRepayment(Document):
                         {
                             "account": exchange_gain_loss_account,
                             "debit_in_account_currency" if exchange_difference > 0 else "credit_in_account_currency": abs(exchange_difference),
+                            "debit" if exchange_difference > 0 else "credit": abs(exchange_difference),
                             "reference_type": "Purchase Loan Request",
                             "reference_name": self.purchase_loan_request
                         },
                         {
                             "account": self.default_account,
                             "credit_in_account_currency" if exchange_difference > 0 else "debit_in_account_currency": abs(exchange_difference),
+                            "credit" if exchange_difference > 0 else "debit": abs(exchange_difference),
                             "reference_type": "Purchase Loan Request",
                             "reference_name": self.purchase_loan_request
                         }
