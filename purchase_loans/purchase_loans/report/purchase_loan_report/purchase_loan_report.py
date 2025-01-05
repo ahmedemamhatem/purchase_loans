@@ -78,22 +78,22 @@ def get_data(filters):
     for row in data:
         # Determine payment_status
         if row.paid_amount_from_request == 0:
-            row.payment_status = "Not Paid"
+            row.payment_status = _("Not Paid")
         elif row.paid_amount_from_request > 0 and row.outstanding_amount_from_request > 0:
-            row.payment_status = "Partial Paid"
+            row.payment_status = _("Partial Paid")
         elif row.outstanding_amount_from_request == 0 and row.overpaid_payment_amount <= 0:
-            row.payment_status = "Fully Paid"
+            row.payment_status = _("Fully Paid")
         elif row.overpaid_payment_amount > 0:
-            row.payment_status = "Over Payment"
+            row.payment_status = _("Over Payment")
 
         # Determine repayment_status
         if row.repaid_amount == 0:
-            row.repayment_status = "Not Repaid"
+            row.repayment_status = _("Not Repaid")
         elif row.repaid_amount > 0 and row.outstanding_amount_from_repayment > 0:
-            row.repayment_status = "Partially Repaid"
+            row.repayment_status = _("Partially Repaid")
         elif row.outstanding_amount_from_repayment == 0 and row.overpaid_repayment_amount <= 0:
-            row.repayment_status = "Fully Repaid"
+            row.repayment_status = _("Fully Repaid")
         elif row.overpaid_repayment_amount > 0:
-            row.repayment_status = "Over RePayment"
+            row.repayment_status = _("Over RePayment")
 
     return data
