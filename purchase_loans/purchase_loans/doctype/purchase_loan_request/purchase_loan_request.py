@@ -25,6 +25,13 @@ class PurchaseLoanRequest(Document):
         if not self.exchange_rate or self.exchange_rate in {0, 1}:
             self.exchange_rate = get_conversion_rate(self)
 
+    def before_validate(self):
+        try:
+            self.direct_approver = frappe.get_value("Employee", self.employee, "custom_purchase_loan_approver")
+        except frappe.DoesNotExistError:
+            pass
+        
+
     def validate(self):
         """
         Validates the Purchase Loan Request document by calculating the outstanding 

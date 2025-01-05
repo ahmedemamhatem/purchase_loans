@@ -22,22 +22,16 @@ def get_columns():
     ]
 
 def get_data(filters):
-    # Check if the `workflow_state` field exists in the `Purchase Loan Request` doctype
     meta = frappe.get_meta("Purchase Loan Request")
-    has_workflow_state = hasattr(meta, "fields") and any(field.fieldname == "workflow_state" for field in meta.fields)
+    has_workflow_state = any(field.fieldname == "workflow_state" for field in meta.fields)
 
-    conditions = []
-    values = {}
-
-    # Add conditions based on filters
+    conditions, values = [], {}
     date_filters = {
         "from_date": "posting_date >= %(from_date)s",
         "to_date": "posting_date <= %(to_date)s",
     }
-    for key, condition in date_filters.items():
-        if filters.get(key):
-            conditions.append(condition)
-            values[key] = filters[key]
+    conditions.extend([date_filters[key] for key in date_filters if filters.get(key)])
+    values.update({key: filters[key] for key in date_filters if filters.get(key)})
 
     if filters.get("employee"):
         conditions.append("employee = %(employee)s")
@@ -50,13 +44,9 @@ def get_data(filters):
     if filters.get("type") in type_condition:
         conditions.append(type_condition[filters["type"]])
 
-    # Construct the WHERE clause
     where_clause = " AND ".join(conditions) if conditions else "1=1"
-
-    # Include `workflow_state` if it exists, otherwise fallback to `docstatus`
     status_column = "workflow_state" if has_workflow_state else "docstatus"
 
-    # Query with status conversion logic
     query = f"""
         SELECT 
             name, posting_date, employee, employee_name, request_amount, outstanding_amount_from_request, 
@@ -70,30 +60,22 @@ def get_data(filters):
         ORDER BY 
             posting_date DESC
     """
-    
-    # Fetch the data
     data = frappe.db.sql(query, values, as_dict=True)
 
-    # Add custom logic for payment_status and repayment_status
     for row in data:
-        # Determine payment_status
-        if row.paid_amount_from_request == 0:
-            row.payment_status = _("Not Paid")
-        elif row.paid_amount_from_request > 0 and row.outstanding_amount_from_request > 0:
-            row.payment_status = _("Partial Paid")
-        elif row.outstanding_amount_from_request == 0 and row.overpaid_payment_amount <= 0:
-            row.payment_status = _("Fully Paid")
-        elif row.overpaid_payment_amount > 0:
-            row.payment_status = _("Over Payment")
+        row.payment_status = (
+            _("Not Paid") if row.paid_amount_from_request == 0 else
+            _("Partial Paid") if row.outstanding_amount_from_request > 0 else
+            _("Fully Paid") if row.overpaid_payment_amount <= 0 and row.overpaid_repayment_amount <= 0 and row.outstanding_amount_from_request == 0 else
+            _("Need Over Payment") if row.repaid_amount > row.paid_amount_from_request else
+            _("Over Payment") if row.overpaid_payment_amount > 0 else ""
+        )
 
-        # Determine repayment_status
-        if row.repaid_amount == 0:
-            row.repayment_status = _("Not Repaid")
-        elif row.repaid_amount > 0 and row.outstanding_amount_from_repayment > 0:
-            row.repayment_status = _("Partially Repaid")
-        elif row.outstanding_amount_from_repayment == 0 and row.overpaid_repayment_amount <= 0:
-            row.repayment_status = _("Fully Repaid")
-        elif row.overpaid_repayment_amount > 0:
-            row.repayment_status = _("Over RePayment")
+        row.repayment_status = (
+            _("Not Repaid") if row.repaid_amount == 0 else
+            _("Partially Repaid") if row.outstanding_amount_from_repayment > 0 else
+            _("Fully Repaid") if row.overpaid_repayment_amount <= 0 and row.outstanding_amount_from_repayment == 0 else
+            _("Over RePayment") if row.overpaid_repayment_amount > 0 else ""
+        )
 
     return data

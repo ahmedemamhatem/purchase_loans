@@ -187,6 +187,7 @@
    "fieldname": "overpaid_repayment_amount",
    "fieldtype": "Float",
    "label": "Overpaid Repayment Amount",
+   "no_copy": 1,
    "read_only": 1
   },
   {
@@ -194,6 +195,7 @@
    "fieldname": "overpaid_payment_amount",
    "fieldtype": "Float",
    "label": "Overpaid Payment Amount",
+   "no_copy": 1,
    "read_only": 1
   },
   {
@@ -240,7 +242,7 @@
    "link_fieldname": "purchase_loan_request"
   }
  ],
- "modified": "2025-01-05 11:19:28.231649",
+ "modified": "2025-01-05 12:50:28.524756",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Request",
