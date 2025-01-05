@@ -53,19 +53,30 @@ def update_purchase_loan_request(purchase_loan_request_name):
     outstanding_from_request = max(request_amount - total_paid, 0)
     overpaid_payment_amount = max(total_paid - request_amount, 0)
 
-    
-    
-
     # Update the Purchase Loan Request document with calculated values
-    frappe.db.set_value("Purchase Loan Request", purchase_loan_request_name, {
-        "paid_amount_from_request": total_paid / exchange_rate,
-        "repaid_amount": total_repaid / exchange_rate,
-        "outstanding_amount_from_request": outstanding_from_request / exchange_rate,
-        "outstanding_amount_from_repayment": outstanding_from_repayment / exchange_rate,
-        "overpaid_payment_amount": overpaid_payment_amount / exchange_rate,
-        "overpaid_repayment_amount": overpaid_amount / exchange_rate
-    })
-    loan_request_doc.reload()
+    frappe.db.sql("""
+        UPDATE `tabPurchase Loan Request`
+        SET 
+            paid_amount_from_request = %s,
+            repaid_amount = %s,
+            outstanding_amount_from_request = %s,
+            outstanding_amount_from_repayment = %s,
+            overpaid_payment_amount = %s,
+            overpaid_repayment_amount = %s
+        WHERE name = %s
+    """, (
+        total_paid / exchange_rate,
+        total_repaid / exchange_rate,
+        outstanding_from_request / exchange_rate,
+        outstanding_from_repayment / exchange_rate,
+        overpaid_payment_amount / exchange_rate,
+        overpaid_amount / exchange_rate,
+        purchase_loan_request_name
+    ))
+
+    # Commit changes to the database
+    frappe.db.commit()
+
 
 @frappe.whitelist()
 def cancel_purchase_loan_ledger(doc):
