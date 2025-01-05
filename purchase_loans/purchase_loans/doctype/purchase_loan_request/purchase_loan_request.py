@@ -38,6 +38,9 @@ class PurchaseLoanRequest(Document):
         if currency:
             self.exchange_rate = get_conversion_rate(self)
         
+        if not self.direct_approver:
+            frappe.throw(_("A Purchase Loan Approver is not set in the Employee Profile. Please update the profile with an approver. If you lack the necessary access, kindly refer this matter to the HR team for assistance."))
+
 
     def _fetch_company_configuration(self):
         """

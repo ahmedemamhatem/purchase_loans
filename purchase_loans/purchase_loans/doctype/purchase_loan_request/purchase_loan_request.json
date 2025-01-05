@@ -12,6 +12,8 @@
   "section_break_woyv",
   "employee",
   "employee_name",
+  "direct_approver",
+  "direct_approver_name",
   "default_account",
   "posting_date",
   "company",
@@ -206,6 +208,24 @@
    "fieldname": "exchange_rate",
    "fieldtype": "Float",
    "label": "Exchange Rate"
+  },
+  {
+   "fetch_from": "employee.custom_purchase_loan_approver",
+   "fieldname": "direct_approver",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Direct Approver User",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "direct_approver.full_name",
+   "fieldname": "direct_approver_name",
+   "fieldtype": "Data",
+   "label": "Direct Approver",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -220,7 +240,7 @@
    "link_fieldname": "purchase_loan_request"
   }
  ],
- "modified": "2024-12-25 14:34:28.984641",
+ "modified": "2025-01-05 11:19:28.231649",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Request",
