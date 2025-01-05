@@ -23,13 +23,6 @@ frappe.query_reports["Purchase Loan Report"] = {
             "fieldtype": "Link",
             "options": "Employee",
             "reqd": 0
-        },
-        {
-            "fieldname": "type",
-            "label": __("Type"),
-            "fieldtype": "Select",
-            "options": "All\nPaid\nNot Paid",
-            "reqd": 0
         }
     ]
 };

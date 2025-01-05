@@ -37,13 +37,6 @@ def get_data(filters):
         conditions.append("employee = %(employee)s")
         values["employee"] = filters["employee"]
 
-    type_condition = {
-        "Not Paid": "outstanding_amount_from_repayment > 0",
-        "Paid": "outstanding_amount_from_repayment = 0",
-    }
-    if filters.get("type") in type_condition:
-        conditions.append(type_condition[filters["type"]])
-
     where_clause = " AND ".join(conditions) if conditions else "1=1"
     status_column = "workflow_state" if has_workflow_state else "docstatus"
 
