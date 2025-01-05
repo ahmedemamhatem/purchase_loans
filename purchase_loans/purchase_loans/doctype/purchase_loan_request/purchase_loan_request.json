@@ -1,6 +1,5 @@
 {
  "actions": [],
- "allow_rename": 1,
  "autoname": "PLR-.{employee}.-.#####",
  "creation": "2024-11-05 11:10:15.203076",
  "doctype": "DocType",
@@ -242,7 +241,7 @@
    "link_fieldname": "purchase_loan_request"
   }
  ],
- "modified": "2025-01-05 12:50:28.524756",
+ "modified": "2025-01-05 15:33:08.079182",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Request",
