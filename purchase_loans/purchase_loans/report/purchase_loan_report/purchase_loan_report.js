@@ -1,6 +1,3 @@
-// Copyright (c) 2024, Ahmed Emam and contributors
-// For license information, please see license.txt
-
 frappe.query_reports["Purchase Loan Report"] = {
 	"filters": [
         {
@@ -22,6 +19,13 @@ frappe.query_reports["Purchase Loan Report"] = {
             "label": __("Employee"),
             "fieldtype": "Link",
             "options": "Employee",
+            "reqd": 0
+        },
+        {
+            "fieldname": "purchase_loan_request",
+            "label": __("Purchase Loan Request"),
+            "fieldtype": "Link",
+            "options": "Purchase Loan Request",
             "reqd": 0
         }
     ]

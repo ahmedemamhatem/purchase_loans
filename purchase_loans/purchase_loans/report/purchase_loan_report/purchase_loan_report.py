@@ -6,7 +6,7 @@ def execute(filters=None):
 
 def get_columns():
     return [
-        {"label": _("Purchase Loan Request"), "fieldname": "name", "fieldtype": "Link", "options": "Purchase Loan Request", "width": 150},
+        {"label": _("Purchase Loan Request"), "fieldname": "name", "fieldtype": "Link", "options": "Purchase Loan Request", "width": 250},
         {"label": _("Loan Status"), "fieldname": "status", "fieldtype": "Data", "width": 150},
         {"label": _("Payment Status"), "fieldname": "payment_status", "fieldtype": "Data", "width": 150},
         {"label": _("RePayment Status"), "fieldname": "repayment_status", "fieldtype": "Data", "width": 150},
@@ -36,6 +36,11 @@ def get_data(filters):
     if filters.get("employee"):
         conditions.append("employee = %(employee)s")
         values["employee"] = filters["employee"]
+
+    # Add condition for the selected Purchase Loan Request filter
+    if filters.get("purchase_loan_request"):
+        conditions.append("name = %(purchase_loan_request)s")
+        values["purchase_loan_request"] = filters["purchase_loan_request"]
 
     where_clause = " AND ".join(conditions) if conditions else "1=1"
     status_column = "workflow_state" if has_workflow_state else "docstatus"
