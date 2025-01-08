@@ -9,7 +9,8 @@
   "other_expenses",
   "account",
   "currency",
-  "amount"
+  "amount",
+  "description"
  ],
  "fields": [
   {
@@ -55,12 +56,22 @@
    "in_standard_filter": 1,
    "label": "Currency",
    "read_only": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "in_filter": 1,
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Description"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-12-25 16:04:36.676866",
+ "modified": "2025-01-08 14:42:04.450157",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Loan Repayment Other Expenses",

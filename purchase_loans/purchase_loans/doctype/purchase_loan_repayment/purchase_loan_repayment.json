@@ -20,6 +20,8 @@
   "purchase_loan_request",
   "loan_amount",
   "outstanding_amount",
+  "direct_approver",
+  "direct_approver_name",
   "section_break_xime",
   "purchase_loan_repayment_invoices",
   "total_invoices",
@@ -182,12 +184,29 @@
    "in_standard_filter": 1,
    "label": "Loan Currency ",
    "read_only": 1
+  },
+  {
+   "fetch_from": "purchase_loan_request.direct_approver",
+   "fieldname": "direct_approver",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Direct Approver User",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "purchase_loan_request.direct_approver_name",
+   "fieldname": "direct_approver_name",
+   "fieldtype": "Data",
+   "label": "Direct Approver",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-12-25 16:07:48.663836",
+ "modified": "2025-01-08 14:44:22.979717",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Repayment",
