@@ -222,7 +222,7 @@ def _create_journal_entry(purchase_loan_request_doc, payment_amount, company, em
         "accounts": [
             {
                 "account": from_account,
-                "debit_in_account_currency" if is_repayment else "credit_in_account_currency": payment_amount_in_currency,
+                "credit_in_account_currency" if is_repayment else "debit_in_account_currency": payment_amount_in_currency,
                 "reference_type": "Purchase Loan Request",  
                 "reference_name": purchase_loan_request_doc.name,
                 "party_type": "Employee",
@@ -232,7 +232,7 @@ def _create_journal_entry(purchase_loan_request_doc, payment_amount, company, em
                 "account": to_account,
                 "account_currency": currency,
                 "exchange_rate": exchange_rate,
-                "credit_in_account_currency" if is_repayment else "debit_in_account_currency": payment_amount,
+                "debit_in_account_currency" if is_repayment else "credit_in_account_currency": payment_amount,
                 "credit" if is_repayment else "debit": payment_amount_in_currency,
                 "reference_type": "Purchase Loan Request",  
                 "reference_name": purchase_loan_request_doc.name
