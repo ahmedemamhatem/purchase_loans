@@ -40,8 +40,21 @@ frappe.ui.form.on('Purchase Loan Repayment', {
         frm.fields_dict['purchase_loan_repayment_invoices'].grid.get_field('purchase_invoice').get_query = function(doc, cdt, cdn) {
             return {
                 filters: {
-                    'custom_employee': doc.custom_employee,  // Updated from 'employee' to 'custom_employee'
+                    'custom_employee': doc.employee,  // Updated from 'employee' to 'custom_employee'
                     'outstanding_amount': ['>', 0]
+                }
+            };
+        };
+    },
+});
+
+frappe.ui.form.on('Purchase Loan Repayment', {
+    setup: function(frm) {
+        // Filter 'purchase_invoice' field in the child table based on custom_employee and outstanding amount
+        frm.fields_dict['loan_repayment_other_expenses'].grid.get_field('other_expenses').get_query = function(doc, cdt, cdn) {
+            return {
+                filters: {
+                    'currency': doc.loan_currency
                 }
             };
         };

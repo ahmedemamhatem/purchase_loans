@@ -23,31 +23,82 @@ frappe.ui.form.on("Purchase Loan Request", {
     refresh(frm) {
         // Check if the document is submitted (docstatus is 1)
         if (frm.doc.docstatus === 1) {
+            // Only display old buttons if the request is not closed (closed === 0)
+            if (frm.doc.closed === 0) {
+                // Display Payment button if outstanding_amount_from_request > 0 or overpaid_repayment_amount > 0
+                if (frm.doc.outstanding_amount_from_request > 0 || frm.doc.overpaid_repayment_amount > 0) {
+                    frm.add_custom_button(__('Pay To Employee'), function() {
+                        show_payment_dialog(frm);
+                    });
+                }
 
-            // Display Payment button if outstanding_amount_from_request > 0
-            if (frm.doc.outstanding_amount_from_request > 0 || frm.doc.overpaid_repayment_amount > 0) {
-                frm.add_custom_button(__('Pay To Employee'), function() {
-                    show_payment_dialog(frm);
-                });
-            }
+                // Display Repay Cash button if repaid_amount < paid_amount_from_request
+                if (frm.doc.repaid_amount < frm.doc.paid_amount_from_request) {
+                    frm.add_custom_button(__('Repay Cash'), function() {
+                        show_repay_cash_dialog(frm);
+                    });
+                }
 
-            // Display Repay Cash button if repaid_amount < paid_amount_from_request
-            if (frm.doc.repaid_amount < frm.doc.paid_amount_from_request) {
-                frm.add_custom_button(__('Repay Cash'), function() {
-                    // Show a dialog for Repay Cash with mode of payment and amount
-                    show_repay_cash_dialog(frm);
-                });
-            }
+                // Display Settlement button only if repaid_amount < paid_amount_from_request
+                if (frm.doc.repaid_amount < frm.doc.paid_amount_from_request) {
+                    frm.add_custom_button(__('Settlement'), function() {
+                        create_settlement(frm);
+                    });
+                }
 
-            // Display Settlement button only if repaid_amount < paid_amount_from_request
-            if (frm.doc.repaid_amount < frm.doc.paid_amount_from_request) {
-                frm.add_custom_button(__('Settlement'), function() {
-                    create_settlement(frm);
-                });
+                // Display "Close" button if the repaid_amount equals paid_amount_from_request
+                if (frm.doc.repaid_amount === frm.doc.paid_amount_from_request) {
+                    frm.add_custom_button(__('Close'), function() {
+                        frappe.confirm(
+                            __('Are you sure you want to close this request?'),
+                            function() {
+                                // Update closed field to 1 (closed)
+                                frappe.call({
+                                    method: 'frappe.client.set_value',
+                                    args: {
+                                        doctype: 'Purchase Loan Request',
+                                        name: frm.doc.name,
+                                        fieldname: 'closed',
+                                        value: 1
+                                    },
+                                    callback: function() {
+                                        frm.reload_doc(); // Reload the form to reflect changes
+                                    }
+                                });
+                            }
+                        );
+                    });
+                }
+            } else {
+                // Display "Reopen" button only for System Manager role
+                if (frappe.user_roles.includes('System Manager')) {
+                    frm.add_custom_button(__('Reopen'), function() {
+                        frappe.confirm(
+                            __('Are you sure you want to reopen this request?'),
+                            function() {
+                                // Update closed field to 0 (reopen)
+                                frappe.call({
+                                    method: 'frappe.client.set_value',
+                                    args: {
+                                        doctype: 'Purchase Loan Request',
+                                        name: frm.doc.name,
+                                        fieldname: 'closed',
+                                        value: 0
+                                    },
+                                    callback: function() {
+                                        frm.reload_doc(); // Reload the form to reflect changes
+                                    }
+                                });
+                            }
+                        );
+                    });
+                }
             }
         }
     }
 });
+
+
 
 
 function show_payment_dialog(frm) {

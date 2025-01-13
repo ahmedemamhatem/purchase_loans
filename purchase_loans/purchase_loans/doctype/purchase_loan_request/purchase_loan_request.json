@@ -22,6 +22,7 @@
   "exchange_rate",
   "overpaid_payment_amount",
   "overpaid_repayment_amount",
+  "closed",
   "section_break_bwxr",
   "paid_amount_from_request",
   "outstanding_amount_from_request",
@@ -227,6 +228,16 @@
    "label": "Direct Approver",
    "no_copy": 1,
    "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "closed",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Closed",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -241,7 +252,7 @@
    "link_fieldname": "purchase_loan_request"
   }
  ],
- "modified": "2025-01-05 15:33:08.079182",
+ "modified": "2025-01-13 10:49:08.004615",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Request",
