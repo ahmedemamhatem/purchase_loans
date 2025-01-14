@@ -109,9 +109,7 @@ def pay_to_employee(loan_request, company, employee, mode_of_payment, payment_am
 
     # Ensure the payment amount is within the outstanding balance
     if custom_allow_payment_beyond_loan_amount == "No" :
-        if  purchase_loan_request_doc.overpaid_repayment_amount > 0 and payment_amount > purchase_loan_request_doc.overpaid_repayment_amount:
-            frappe.throw(_("Payment amount cannot exceed the outstanding loan amount."))
-        elif  purchase_loan_request_doc.outstanding_amount_from_request > 0 and payment_amount > purchase_loan_request_doc.outstanding_amount_from_request:
+        if payment_amount > (purchase_loan_request_doc.outstanding_amount_from_request + purchase_loan_request_doc.overpaid_repayment_amount):
             frappe.throw(_("Payment amount cannot exceed the outstanding loan amount."))
 
     # Ensure mode of payment is provided
