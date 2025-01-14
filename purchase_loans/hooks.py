@@ -17,6 +17,15 @@ doc_events = {
     "Journal Entry": {
         "on_cancel": "purchase_loans.purchase_loans.tasks.update_purchase_loan_request_on_cancel",
         "on_submit": "purchase_loans.purchase_loans.tasks.update_purchase_loan_request_on_submit"
+    },
+    "Payment Entry": {
+        "validate": "purchase_loans.purchase_loans.tasks.validate_payment_entry"
+    },
+    "Purchase Order": {
+        "validate": "purchase_loans.purchase_loans.tasks.add_id_to_purchase_order"
+    },
+    "Purchase Invoice": {
+        "validate": "purchase_loans.purchase_loans.tasks.add_id_to_purchase_invoice"
     }
 }
 

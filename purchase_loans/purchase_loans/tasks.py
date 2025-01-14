@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
-
+import random
+import string
 
 
 @frappe.whitelist()
@@ -76,6 +77,85 @@ def update_purchase_loan_request(purchase_loan_request_name):
 
     # Commit changes to the database
     frappe.db.commit()
+
+
+
+
+@frappe.whitelist()
+def add_id_to_purchase_order(doc, method):
+    try:
+        if not doc.custom_transaction_unique_id:
+            # Generate a random string of 8 characters
+            random_str = ''.join(random.choices(string.digits, k=8))
+            # Combine 'ORD' with the random string to form a unique ID
+            unique_id = f"ORD-{random_str}"
+            # Set the generated ID to the custom field
+            doc.custom_transaction_unique_id = unique_id
+    except Exception as e:
+        frappe.log_error(f"Error generating unique ID for Purchase Order {doc.name}: {str(e)}")
+        frappe.throw(_("Error generating unique ID"))
+
+@frappe.whitelist()
+def add_id_to_purchase_invoice(doc, method):
+    try:
+        if doc.items:
+            for m in doc.items:
+                # Ensure that purchase_order is present
+                if m.purchase_order:
+                    # Fetch the Purchase Order document
+                    purchase_order = frappe.get_doc("Purchase Order", m.purchase_order)
+                    
+                    # Check if custom_transaction_unique_id exists in the Purchase Order
+                    if purchase_order.custom_transaction_unique_id:
+                        # Assign the ID from the Purchase Order to the Purchase Invoice
+                        doc.custom_transaction_unique_id = purchase_order.custom_transaction_unique_id
+                        break  # Once we set the ID, we can stop the loop as it's assumed to be unique
+                    else:
+                        # Optionally, handle the case where there is no ID on the Purchase Order
+                        frappe.throw(_("Custom Transaction Unique ID not found on Purchase Order: {0}".format(m.purchase_order)))
+        
+    except Exception as e:
+        # Log and throw any unexpected errors
+        frappe.log_error(f"Error assigning custom_transaction_unique_id to Purchase Invoice {doc.name}: {str(e)}")
+        frappe.throw(_("Error assigning unique ID"))
+
+
+@frappe.whitelist()
+def validate_payment_entry(doc, method):
+    try:
+        if not doc.references:
+            frappe.throw(_("No references found in the Payment Entry"))
+        
+        total_allocated_amount = 0
+        custom_transaction_unique_id = None  # Initialize variable outside of the loop
+
+        for m in doc.references:
+            purchase_invoice = frappe.get_doc(m.reference_doctype, m.reference_name)
+            currency = purchase_invoice.currency
+            # Set custom_transaction_unique_id only once, assuming it's consistent across all references
+            if purchase_invoice.doctype == "Purchase Invoice" and not custom_transaction_unique_id:
+                custom_transaction_unique_id = purchase_invoice.custom_transaction_unique_id
+                doc.custom_transaction_unique_id = custom_transaction_unique_id
+
+            # Currency mismatch validation
+            if doc.payment_type == "Pay" and doc.paid_from_account_currency != currency:
+                frappe.throw(_("Currency mismatch: The currency of the payment account does not match the currency of the invoice"))
+
+            # Set allocated_amount
+            m.allocated_amount = m.outstanding_amount if m.outstanding_amount else 0
+            total_allocated_amount += m.allocated_amount
+
+        # Update total allocated amount in the Payment Entry
+        doc.total_allocated_amount = total_allocated_amount
+
+        # Validate if the paid amount exceeds the total allocated amount
+        if (doc.paid_amount * doc.source_exchange_rate) > doc.total_allocated_amount:
+            frappe.throw(_("Paid amount exceeds the total allocated amount"))
+
+    except Exception as e:
+        # Log the error for debugging purposes
+        frappe.throw(_("An error occurred while validating the payment entry"))
+
 
 
 @frappe.whitelist()
