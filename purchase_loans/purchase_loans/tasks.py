@@ -127,33 +127,34 @@ def validate_payment_entry(doc, method):
             frappe.throw(_("No references found in the Payment Entry"))
         
         total_allocated_amount = 0
-        custom_transaction_unique_id = None  # Initialize variable outside of the loop
+        total_outstanding_amount = 0
+        total_outstanding_amount_net = 0
+        custom_transaction_unique_id = None
 
-        for m in doc.references:
-            purchase_invoice = frappe.get_doc(m.reference_doctype, m.reference_name)
+        for ref in doc.references:
+            purchase_invoice = frappe.get_doc(ref.reference_doctype, ref.reference_name)
             currency = purchase_invoice.currency
-            # Set custom_transaction_unique_id only once, assuming it's consistent across all references
+            account = frappe.get_doc("Account", purchase_invoice.credit_to)
+            account_currency = account.account_currency
+            total_outstanding_amount = purchase_invoice.outstanding_amount 
             if purchase_invoice.doctype == "Purchase Invoice" and not custom_transaction_unique_id:
                 custom_transaction_unique_id = purchase_invoice.custom_transaction_unique_id
                 doc.custom_transaction_unique_id = custom_transaction_unique_id
 
-            # Currency mismatch validation
             if doc.payment_type == "Pay" and doc.paid_from_account_currency != currency:
                 frappe.throw(_("Currency mismatch: The currency of the payment account does not match the currency of the invoice"))
 
-            # Set allocated_amount
-            m.allocated_amount = m.outstanding_amount if m.outstanding_amount else 0
-            total_allocated_amount += m.allocated_amount
+            ref.allocated_amount = doc.paid_amount * doc.source_exchange_rate if account_currency != currency else doc.paid_amount
+            total_allocated_amount += ref.allocated_amount
+            total_outstanding_amount_net += total_outstanding_amount
 
-        # Update total allocated amount in the Payment Entry
         doc.total_allocated_amount = total_allocated_amount
 
-        # Validate if the paid amount exceeds the total allocated amount
-        if (doc.paid_amount * doc.source_exchange_rate) > doc.total_allocated_amount:
-            frappe.throw(_("Paid amount exceeds the total allocated amount"))
+        # if doc.total_allocated_amount > total_outstanding_amount_net:
+        #     frappe.throw(_("Paid amount exceeds the total allocated amount"))
 
     except Exception as e:
-        # Log the error for debugging purposes
+        frappe.log_error(f"Error in Payment Entry {doc.name}: {str(e)}")
         frappe.throw(_("An error occurred while validating the payment entry"))
 
 
