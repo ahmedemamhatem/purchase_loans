@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 import random
 import string
-
+import re
 
 @frappe.whitelist()
 def update_purchase_loan_request(purchase_loan_request_name):
@@ -80,20 +80,36 @@ def update_purchase_loan_request(purchase_loan_request_name):
 
 
 
-
 @frappe.whitelist()
 def add_id_to_purchase_order(doc, method):
     try:
         if not doc.custom_transaction_unique_id:
-            # Generate a random string of 8 characters
-            random_str = ''.join(random.choices(string.digits, k=8))
-            # Combine 'ORD' with the random string to form a unique ID
-            unique_id = f"ORD-{random_str}"
+            # Query the existing Purchase Orders to find the highest unique ID
+            existing_ids = frappe.db.get_all('Purchase Order', filters={'custom_transaction_unique_id': ['like', 'ORD-%']}, fields=['custom_transaction_unique_id'])
+            
+            # Extract the numerical part and find the highest number
+            highest_num = 0
+            for record in existing_ids:
+                match = re.search(r'ORD-(\d{8})$', record.custom_transaction_unique_id)  # Match 8-digit numbers only
+                if match:
+                    num = int(match.group(1))
+                    if num > highest_num:
+                        highest_num = num
+            
+            # Increment the highest number found or start with 1 if none found
+            new_num = highest_num + 1 if highest_num > 0 else 1
+            
+            # Generate the unique ID with the new number
+            unique_id = f"ORD-{new_num:08d}"  # Padded to ensure 8 digits
+            
             # Set the generated ID to the custom field
             doc.custom_transaction_unique_id = unique_id
+            
     except Exception as e:
         frappe.log_error(f"Error generating unique ID for Purchase Order {doc.name}: {str(e)}")
         frappe.throw(_("Error generating unique ID"))
+
+
 
 @frappe.whitelist()
 def add_id_to_purchase_invoice(doc, method):
