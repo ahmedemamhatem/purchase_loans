@@ -1,9 +1,314 @@
 import frappe
+from frappe.utils import nowdate
+from frappe.utils import cint, cstr, flt, get_link_to_form, getdate
 from frappe import _
 import random
 import string
 import re
 
+
+@frappe.whitelist()
+def validate_patch(self):
+    self.flags.ignore_submit_comment = True
+    from erpnext.stock.utils import validate_disabled_warehouse, validate_warehouse_company
+
+    self.set_posting_datetime()
+    self.validate_mandatory()
+    voucher = frappe.get_doc(self.voucher_type, self.voucher_no)
+    if self.voucher_type in ["Stock Entry","Purchase Receipt","Delivery Note"] and voucher.custom_allow_expired_batches == 0:
+        self.validate_batch()
+    elif self.voucher_type not in ["Stock Entry", "Purchase Receipt" , "Purchase Invoice"]:
+        self.validate_batch()
+    validate_disabled_warehouse(self.warehouse)
+    validate_warehouse_company(self.warehouse, self.company)
+    self.scrub_posting_time()
+    self.validate_and_set_fiscal_year()
+    self.block_transactions_against_group_warehouse()
+    self.validate_with_last_transaction_posting_time()
+    self.validate_inventory_dimension_negative_stock()
+
+
+
+@frappe.whitelist()
+def validate_serialized_batch(self):
+    from erpnext.stock.doctype.serial_no.serial_no import get_serial_nos
+    from frappe.utils import flt, getdate
+
+    is_material_issue = False
+
+    for d in self.get("items"):
+        # Validate serial numbers against batches
+        if hasattr(d, "serial_no") and hasattr(d, "batch_no") and d.serial_no and d.batch_no:
+            serial_nos = frappe.get_all(
+                "Serial No",
+                fields=["batch_no", "name", "warehouse"],
+                filters={"name": ("in", get_serial_nos(d.serial_no))},
+            )
+
+            for row in serial_nos:
+                if row.warehouse and row.batch_no != d.batch_no:
+                    frappe.throw(
+                        _("Row #{0}: Serial No {1} does not belong to Batch {2}").format(
+                            d.idx, row.name, d.batch_no
+                        )
+                    )
+
+        # Skip checks for material issue
+        if is_material_issue:
+            continue
+
+        # Validate batch expiry for other cases
+        if flt(d.qty) > 0.0 and d.get("batch_no") and self.get("posting_date") and self.docstatus < 2:
+            expiry_date = frappe.get_cached_value("Batch", d.get("batch_no"), "expiry_date")
+
+            if expiry_date and getdate(expiry_date) < getdate(self.posting_date):
+                if self.doctype in ["Stock Entry", "Purchase Receipt", "Delivery Note"] and self.get("custom_allow_expired_batches") == 1:
+                    pass
+                else:
+                    frappe.throw(
+                        _("Row #{0}: The batch {1} has already expired.").format(
+                            d.idx, get_link_to_form("Batch", d.get("batch_no"))
+                        ),
+                        frappe.ValidationError,
+                    )
+
+
+@frappe.whitelist()
+def transfer_expired_batch_on_validate(doc, method):
+    """
+    Transfer expired batch balances to the custom warehouse during Batch validation.
+    """
+    # Check if the batch has expired
+    today = nowdate()
+    if doc.expiry_date and doc.expiry_date > today:
+        return  # Skip if the batch is not expired
+
+    # Fetch the remaining balance for the batch
+    expired_batch = frappe.db.sql(
+        """
+        SELECT 
+            SUM(sbb.total_qty) AS balance_qty,
+            sbb.item_code,
+            sbb.company,
+            sbb.warehouse AS source_warehouse,
+            b.expiry_date,
+            b.stock_uom
+        FROM 
+            `tabSerial and Batch Bundle` sbb
+        JOIN 
+            `tabSerial and Batch Entry` sbe ON sbe.parent = sbb.name
+        JOIN 
+            `tabBatch` b ON b.name = sbe.batch_no
+        WHERE 
+            b.name = %s
+            AND sbb.is_cancelled = 0
+            AND sbb.is_rejected = 0
+        GROUP BY 
+            sbb.item_code, sbb.warehouse, b.expiry_date, b.stock_uom
+        HAVING 
+            balance_qty > 0
+        """,
+        (doc.name,),
+        as_dict=True,
+    )
+
+    if not expired_batch:
+        return  # No balance to transfer
+
+    # Process the transfer
+    for batch in expired_batch:
+        company = batch["company"]
+        company_record = frappe.get_doc("Company", company)
+        custom_warehouse = company_record.custom_warehouse
+        custom_enable_automatic_transfer = company_record.custom_enable_automatic_transfer
+        if custom_enable_automatic_transfer == "No":
+            return
+
+        if not custom_warehouse:
+            frappe.throw(
+                f"Custom Warehouse is not set in the Company configuration for company {company}."
+            )
+
+        if custom_warehouse == batch["source_warehouse"]:
+            continue  # Skip if the custom warehouse is the same as the source warehouse
+
+        try:
+            # Create a Stock Entry for the transfer
+            stock_entry = frappe.new_doc("Stock Entry")
+            stock_entry.stock_entry_type = "Material Transfer"
+            stock_entry.custom_allow_expired_batches = 1
+            stock_entry.posting_date = today
+
+            # Add the item to the Stock Entry
+            stock_entry.append(
+                "items",
+                {
+                    "item_code": batch["item_code"],
+                    "qty": batch["balance_qty"],
+                    "transfer_qty": batch["balance_qty"],
+                    "uom": batch["stock_uom"],
+                    "stock_uom": batch["stock_uom"],
+                    "conversion_factor": 1,
+                    "use_serial_batch_fields": 1,
+                    "batch_no": doc.name,
+                    "s_warehouse": batch["source_warehouse"],
+                    "t_warehouse": custom_warehouse,
+                },
+            )
+
+            # Save and submit the Stock Entry
+            stock_entry.save(ignore_permissions=True)
+            stock_entry.submit()
+
+            frappe.msgprint(
+                f"Transferred {batch['balance_qty']} of Item {batch['item_code']} (Batch {doc.name}) "
+                f"from {batch['source_warehouse']} to {custom_warehouse}."
+            )
+
+        except Exception as e:
+            frappe.log_error(
+                f"Error transferring Batch {doc.name} of Item {batch['item_code']}: {str(e)}",
+                "Expired Batch Transfer Job",
+            )
+
+
+
+@frappe.whitelist()
+def transfer_expired_batches():
+    """
+    Scheduled job to transfer all expired batch balances to the custom warehouse.
+    Runs daily at midnight.
+    """
+    today = nowdate()
+
+    # Fetch all expired batches with remaining balances 
+    expired_batches = frappe.db.sql(
+        """
+        SELECT 
+            SUM(sbb.total_qty) AS balance_qty,
+            sbb.item_code,
+            sbb.company,
+            sbb.warehouse AS source_warehouse,
+            sbe.batch_no,
+            b.expiry_date,
+            b.stock_uom
+        FROM 
+            `tabSerial and Batch Bundle` sbb
+        JOIN 
+            `tabSerial and Batch Entry` sbe ON sbe.parent = sbb.name
+        JOIN 
+            `tabBatch` b ON b.name = sbe.batch_no
+        WHERE 
+            b.expiry_date <= %s
+            AND sbb.is_cancelled = 0
+            AND sbb.is_rejected = 0
+        GROUP BY 
+            sbb.item_code, sbb.warehouse, sbe.batch_no
+        HAVING 
+            balance_qty > 0
+        """,
+        (today,),
+        as_dict=True,
+    )
+
+    if not expired_batches:
+        frappe.log_error("No expired batches with balances found.", "Expired Batch Transfer Job")
+        return
+
+    for batch in expired_batches:
+        company = batch["company"]
+        company_record = frappe.get_doc("Company", company)
+        custom_warehouse = company_record.custom_warehouse
+        custom_enable_automatic_transfer = company_record.custom_enable_automatic_transfer
+        if custom_enable_automatic_transfer == "No":
+            return
+        if not custom_warehouse:
+            frappe.log_error("Custom Warehouse is not set in the Company configuration.")
+            return
+        if custom_warehouse == batch["source_warehouse"]:
+            return
+        # Create a Stock Entry for the transfer
+        stock_entry = frappe.new_doc("Stock Entry")
+        stock_entry.stock_entry_type = "Material Transfer"
+        stock_entry.custom_allow_expired_batches = 1
+        stock_entry.posting_date = today
+
+        # Add the item to the Stock Entry
+        stock_entry.append(
+            "items",
+            {
+                "item_code": batch["item_code"],
+                "qty": batch["balance_qty"],
+                "transfer_qty": batch["balance_qty"],
+                "uom": batch["stock_uom"],
+                "stock_uom": batch["stock_uom"],
+                "conversion_factor": 1,
+                "use_serial_batch_fields": 1,
+                "batch_no": batch["batch_no"],
+                "s_warehouse": batch["source_warehouse"],
+                "t_warehouse": custom_warehouse,
+            },
+        )
+
+        # Save and submit the Stock Entry
+        stock_entry.save(ignore_permissions=True)
+        stock_entry.submit()
+
+        frappe.msgprint(
+            f"Transferred {batch['balance_qty']} of Item {batch['item_code']} (Batch {batch['batch_no']}) "
+            f"from {batch['source_warehouse']} to {custom_warehouse}."
+        )
+
+
+
+
+@frappe.whitelist()
+def validate_sales_order(doc, method):
+    for item in doc.items:
+        # Fetch the company's custom role
+        company_record = frappe.get_doc("Company", doc.company)
+        required_role = company_record.custom_role
+
+        # Check if the item is a stock item or a fixed asset
+        is_stock_item = frappe.db.get_value("Item", item.item_code, "is_stock_item")
+        is_fixed_asset = frappe.db.get_value("Item", item.item_code, "is_fixed_asset")
+
+        # Get the roles of the currently logged-in user
+        user_roles = frappe.get_roles(frappe.session.user)
+
+        # Restrict users with the required role from creating orders for stock or fixed asset items
+        if (is_stock_item == 1 or is_fixed_asset == 1) and required_role in user_roles:
+            frappe.throw("You cannot create orders for stock or fixed asset items.")
+
+        # If the item is a stock item, check stock availability
+        if is_stock_item == 1:
+            # Use SQL to get the total actual quantity and reserved quantity for the item across all warehouses
+            result = frappe.db.sql(
+                """
+                SELECT SUM(actual_qty) as actual_qty, SUM(reserved_qty) as reserved_qty
+                FROM `tabBin` 
+                WHERE item_code = %s
+                """,
+                (item.item_code,)
+            )
+
+            # Get actual_qty and reserved_qty from the result or set them to 0 if no data is found
+            total_qty = result[0][0] if result else 0
+            reserved_qty = result[0][1] if result else 0
+
+            # Calculate available quantity
+            available_qty = total_qty - reserved_qty
+
+            # Check if available quantity is less than the ordered quantity
+            if available_qty < item.qty:
+                frappe.throw(
+                    f"Insufficient stock for Item {item.item_code}.<br>"
+                    f"<b>Available Quantity:</b> {total_qty} <b>(Available after Reservations: {available_qty}, Reserved: {reserved_qty})</b><br>"
+                    f"<b>Ordered Quantity:</b> {item.qty}.<br>"
+                    "You can only sell the Available after Reservations."
+                )
+
+            
 @frappe.whitelist()
 def update_purchase_loan_request(purchase_loan_request_name):
     """
@@ -79,36 +384,46 @@ def update_purchase_loan_request(purchase_loan_request_name):
     frappe.db.commit()
 
 
-
 @frappe.whitelist()
 def add_id_to_purchase_order(doc, method):
-    try:
-        if not doc.custom_transaction_unique_id:
-            # Query the existing Purchase Orders to find the highest unique ID
-            existing_ids = frappe.db.get_all('Purchase Order', filters={'custom_transaction_unique_id': ['like', 'ORD-%']}, fields=['custom_transaction_unique_id'])
-            
-            # Extract the numerical part and find the highest number
-            highest_num = 0
-            for record in existing_ids:
-                match = re.search(r'ORD-(\d{8})$', record.custom_transaction_unique_id)  # Match 8-digit numbers only
-                if match:
-                    num = int(match.group(1))
-                    if num > highest_num:
-                        highest_num = num
-            
-            # Increment the highest number found or start with 1 if none found
-            new_num = highest_num + 1 if highest_num > 0 else 1
-            
-            # Generate the unique ID with the new number
-            unique_id = f"ORD-{new_num:08d}"  # Padded to ensure 8 digits
-            
-            # Set the generated ID to the custom field
-            doc.custom_transaction_unique_id = unique_id
-            
-    except Exception as e:
-        frappe.log_error(f"Error generating unique ID for Purchase Order {doc.name}: {str(e)}")
-        frappe.throw(_("Error generating unique ID"))
+    
+    for item in doc.items:
+        # Fetch the company's custom role
+        company_record = frappe.get_doc("Company", doc.company)
+        required_role = company_record.custom_role
 
+        # Check if the item is a stock item or a fixed asset
+        is_stock_item = frappe.db.get_value("Item", item.item_code, "is_stock_item")
+        is_fixed_asset = frappe.db.get_value("Item", item.item_code, "is_fixed_asset")
+
+        # Get the roles of the currently logged-in user
+        user_roles = frappe.get_roles(frappe.session.user)
+
+        # Restrict users with the required role from creating orders for stock or fixed asset items
+        if (is_stock_item == 1 or is_fixed_asset == 1) and required_role in user_roles:
+            frappe.throw("You cannot create orders for stock or fixed asset items.")
+
+    if not doc.custom_transaction_unique_id:
+        # Query the existing Purchase Orders to find the highest unique ID
+        existing_ids = frappe.db.get_all('Purchase Order', filters={'custom_transaction_unique_id': ['like', 'ORD-%']}, fields=['custom_transaction_unique_id'])
+        
+        # Extract the numerical part and find the highest number
+        highest_num = 0
+        for record in existing_ids:
+            match = re.search(r'ORD-(\d{8})$', record.custom_transaction_unique_id)  # Match 8-digit numbers only
+            if match:
+                num = int(match.group(1))
+                if num > highest_num:
+                    highest_num = num
+        
+        # Increment the highest number found or start with 1 if none found
+        new_num = highest_num + 1 if highest_num > 0 else 1
+        
+        # Generate the unique ID with the new number
+        unique_id = f"ORD-{new_num:08d}"  # Padded to ensure 8 digits
+        
+        # Set the generated ID to the custom field
+        doc.custom_transaction_unique_id = unique_id
 
 
 @frappe.whitelist()
@@ -148,13 +463,14 @@ def validate_payment_entry(doc, method):
         custom_transaction_unique_id = None
 
         for ref in doc.references:
-            purchase_invoice = frappe.get_doc(ref.reference_doctype, ref.reference_name)
-            currency = purchase_invoice.currency
-            account = frappe.get_doc("Account", purchase_invoice.credit_to)
+            invoice = frappe.get_doc(ref.reference_doctype, ref.reference_name)
+            currency = invoice.currency
+            account =  invoice.credit_to if ref.reference_doctype == "Purchase Invoice" else   invoice.debit_to
+            account = frappe.get_doc("Account", account)
             account_currency = account.account_currency
-            total_outstanding_amount = purchase_invoice.outstanding_amount 
-            if purchase_invoice.doctype == "Purchase Invoice" and not custom_transaction_unique_id:
-                custom_transaction_unique_id = purchase_invoice.custom_transaction_unique_id
+            total_outstanding_amount = invoice.outstanding_amount 
+            if invoice.doctype == "Purchase Invoice" and not custom_transaction_unique_id:
+                custom_transaction_unique_id = invoice.custom_transaction_unique_id
                 doc.custom_transaction_unique_id = custom_transaction_unique_id
 
             if doc.payment_type == "Pay" and doc.paid_from_account_currency != currency:
@@ -172,7 +488,6 @@ def validate_payment_entry(doc, method):
     except Exception as e:
         frappe.log_error(f"Error in Payment Entry {doc.name}: {str(e)}")
         frappe.throw(_("An error occurred while validating the payment entry"))
-
 
 
 @frappe.whitelist()

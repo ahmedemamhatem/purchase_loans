@@ -8,10 +8,24 @@ app_license = "mit"
 # Apps
 # ------------------
 
+from erpnext.controllers.stock_controller import StockController
+from erpnext.stock.doctype.stock_ledger_entry.stock_ledger_entry import StockLedgerEntry
+from purchase_loans.purchase_loans.tasks import validate_serialized_batch
+from purchase_loans.purchase_loans.tasks import validate_patch
+
+StockController.validate_serialized_batch = validate_serialized_batch
+StockLedgerEntry.validate = validate_patch
+
 fixtures = [
     {"dt": "Custom Field"},
     {"dt": "Property Setter"}
     ]
+
+scheduler_events = {
+    "daily": [
+        "purchase_loans.purchase_loans.tasks.transfer_expired_batches"
+    ]
+}
 
 doc_events = {
     "Journal Entry": {
@@ -20,6 +34,12 @@ doc_events = {
     },
     "Payment Entry": {
         "validate": "purchase_loans.purchase_loans.tasks.validate_payment_entry"
+    },
+    "Batch": {
+        "validate": "purchase_loans.purchase_loans.tasks.transfer_expired_batch_on_validate"
+    },
+    "Sales Order": {
+        "validate": "purchase_loans.purchase_loans.tasks.validate_sales_order"
     },
     "Purchase Order": {
         "validate": "purchase_loans.purchase_loans.tasks.add_id_to_purchase_order"
