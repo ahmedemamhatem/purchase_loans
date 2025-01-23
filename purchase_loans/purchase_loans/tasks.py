@@ -28,7 +28,6 @@ def validate_patch(self):
     self.validate_inventory_dimension_negative_stock()
 
 
-
 @frappe.whitelist()
 def validate_serialized_batch(self):
     from erpnext.stock.doctype.serial_no.serial_no import get_serial_nos
@@ -172,7 +171,6 @@ def transfer_expired_batch_on_validate(doc, method):
             )
 
 
-
 @frappe.whitelist()
 def transfer_expired_batches():
     """
@@ -277,7 +275,7 @@ def validate_sales_order(doc, method):
         user_roles = frappe.get_roles(frappe.session.user)
 
         # Restrict users with the required role from creating orders for stock or fixed asset items
-        if (is_stock_item == 1 or is_fixed_asset == 1) and required_role in user_roles:
+        if (is_stock_item == 1 or is_fixed_asset == 1) and required_role in user_roles and frappe.session.user != "Administrator":
             frappe.throw("You cannot create orders for stock or fixed asset items.")
 
         # If the item is a stock item, check stock availability
@@ -400,7 +398,7 @@ def add_id_to_purchase_order(doc, method):
         user_roles = frappe.get_roles(frappe.session.user)
 
         # Restrict users with the required role from creating orders for stock or fixed asset items
-        if (is_stock_item == 1 or is_fixed_asset == 1) and required_role in user_roles:
+        if (is_stock_item == 1 or is_fixed_asset == 1) and required_role in user_roles and frappe.session.user != "Administrator":
             frappe.throw("You cannot create orders for stock or fixed asset items.")
 
     if not doc.custom_transaction_unique_id:
