@@ -99,7 +99,7 @@
   {
    "default": "Today",
    "fieldname": "posting_date",
-   "fieldtype": "Data",
+   "fieldtype": "Date",
    "in_filter": 1,
    "in_global_search": 1,
    "in_list_view": 1,
@@ -252,7 +252,7 @@
    "link_fieldname": "purchase_loan_request"
   }
  ],
- "modified": "2025-01-13 10:49:08.004615",
+ "modified": "2025-01-23 18:08:23.352760",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Request",
