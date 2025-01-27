@@ -23,7 +23,8 @@ fixtures = [
 
 scheduler_events = {
     "daily": [
-        "purchase_loans.purchase_loans.tasks.transfer_expired_batches"
+        "purchase_loans.purchase_loans.tasks.transfer_expired_batches",
+        "purchase_loans.purchase_loans.tasks.notify_purchase_orders_without_receipts"
     ]
 }
 

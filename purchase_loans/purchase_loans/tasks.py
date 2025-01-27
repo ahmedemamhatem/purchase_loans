@@ -1,10 +1,418 @@
 import frappe
-from frappe.utils import nowdate
+from frappe.utils import nowdate, add_days, date_diff
 from frappe.utils import cint, cstr, flt, get_link_to_form, getdate
 from frappe import _
 import random
 import string
 import re
+
+def notify_purchase_order_and_invoice_issues():
+
+    notify_sales_orders_without_delivery()
+    notify_sales_orders_with_less_billed_amt()
+    notify_sales_invoices_not_paid()
+
+
+    notify_purchase_orders_without_receipts()
+    notify_purchase_invoices_not_paid()
+    notify_purchase_orders_with_items_billed_amt_less_than_net_amount()
+
+
+def notify_sales_invoices_not_paid():
+    # Today's date
+    today = nowdate()
+
+    # Fetch Sales Invoices where billed amount is greater than the paid amount
+    invoices_not_paid = frappe.db.sql("""
+        SELECT si.name AS invoice_name, si.posting_date, si.grand_total,
+               si.outstanding_amount, si.paid_amount
+        FROM `tabSales Invoice` si
+       
+        WHERE si.docstatus = 1
+        AND si.outstanding_amount > 0  
+    """, as_dict=True)
+
+    # Prepare email content for notifications
+    invoices_to_notify = []
+    for invoice in invoices_not_paid:
+        posting_date = invoice["posting_date"]
+        
+        # Calculate the difference between today and the posting date
+        days_difference = date_diff(today, posting_date)
+
+        # Check if it's exactly 2 days or every 10 days
+        if days_difference == 2 or (days_difference > 2 and days_difference % 10 == 0):
+            invoices_to_notify.append(invoice)
+
+    if invoices_to_notify:
+        # Fetch System Managers for email recipients
+        system_managers = frappe.get_all(
+            "Has Role",
+            filters={"role": "System Manager"},
+            fields=["parent"]
+        )
+        recipients = frappe.get_all(
+            "User",
+            filters={"name": ["in", [sm["parent"] for sm in system_managers]], "enabled": 1},
+            fields=["email"]
+        )
+        recipient_list = [user["email"] for user in recipients if user["email"]]
+
+        if not recipient_list:
+            frappe.log_error("No System Managers found to send notifications.")
+            return
+
+        # Prepare email content
+        subject = "Sales Invoices Not Paid"
+        message = "<p>The following Sales Invoices have outstanding amounts (unpaid):</p>"
+        message += "<ul>"
+        for invoice in invoices_to_notify:
+            message += f"<li>Invoice: {invoice['invoice_name']} | Date: {invoice['posting_date']} | Total: {invoice['grand_total']} | Outstanding: {invoice['outstanding_amount']}</li>"
+            message += f"<ul>"
+        message += "</ul>"
+
+        # Send email
+        frappe.sendmail(
+            recipients=recipient_list,
+            subject=subject,
+            message=message
+        )
+
+
+def notify_sales_orders_with_less_billed_amt():
+    # Today's date
+    today = nowdate()
+
+    # Fetch Sales Orders with billed amount less than net amount
+    so_with_less_billed_amt = frappe.db.sql("""
+        SELECT so.name AS so_name, so.transaction_date, so.grand_total,
+               soi.item_code, soi.item_name,
+               soi.qty AS ordered_qty, soi.delivered_qty, soi.rate, soi.amount
+        FROM `tabSales Order` so
+        INNER JOIN `tabSales Order Item` soi ON so.name = soi.parent
+        WHERE so.docstatus = 1
+        AND soi.base_net_amount > soi.billed_amt  
+    """, as_dict=True)
+
+    # Prepare email content for notifications
+    so_to_notify = []
+    for so in so_with_less_billed_amt:
+        transaction_date = so["transaction_date"]
+
+        # Calculate the difference between today and the transaction date
+        days_difference = date_diff(today, transaction_date)
+
+        # Check if it's exactly 2 days or every 10 days
+        if days_difference == 2 or (days_difference > 2 and days_difference % 10 == 0):
+            so_to_notify.append(so)
+
+    if so_to_notify:
+        # Fetch System Managers for email recipients
+        system_managers = frappe.get_all(
+            "Has Role",
+            filters={"role": "System Manager"},
+            fields=["parent"]
+        )
+        recipients = frappe.get_all(
+            "User",
+            filters={"name": ["in", [sm["parent"] for sm in system_managers]], "enabled": 1},
+            fields=["email"]
+        )
+        recipient_list = [user["email"] for user in recipients if user["email"]]
+
+        if not recipient_list:
+            frappe.log_error("No System Managers found to send notifications.")
+            return
+
+        # Prepare email content
+        subject = "Sales Orders with Billed Amount Less Than Net Amount"
+        message = "<p>The following Sales Orders have Billed Amount less than the Net Amount:</p>"
+        message += "<ul>"
+        for so in so_to_notify:
+            message += f"<li>SO: {so['so_name']} | Date: {so['transaction_date']} | Total: {so['grand_total']} </li>"
+            message += f"<ul>"
+            message += f"<li>Item: {so['item_name']} | Ordered Qty: {so['ordered_qty']} | Delivered Qty: {so['delivered_qty']}</li>"
+            message += f"<li>Rate: {so['rate']} | Amount: {so['amount']}</li>"
+            message += f"</ul>"
+        message += "</ul>"
+
+        # Send email
+        frappe.sendmail(
+            recipients=recipient_list,
+            subject=subject,
+            message=message
+        )
+
+
+def notify_sales_orders_without_delivery():
+    # Today's date
+    today = nowdate()
+
+    # Fetch Sales Orders with Stock/Fixed Asset Items and Delivered Quantity < Ordered Quantity
+    so_without_delivery = frappe.db.sql("""
+        SELECT so.name AS so_name, so.transaction_date, so.grand_total,
+               soi.item_code, soi.item_name, soi.qty AS ordered_qty, 
+               soi.delivered_qty, soi.rate, soi.amount
+        FROM `tabSales Order` so
+        INNER JOIN `tabSales Order Item` soi ON so.name = soi.parent
+        WHERE so.docstatus = 1
+        AND soi.qty > (soi.delivered_qty + soi.returned_qty)
+        AND soi.item_code IN (
+            SELECT name FROM `tabItem`
+            WHERE is_stock_item = 1 OR is_fixed_asset = 1
+        )
+    """, as_dict=True)
+
+    # Prepare email content for notifications
+    so_to_notify = []
+    for so in so_without_delivery:
+        transaction_date = so["transaction_date"]
+
+        # Calculate the difference between today and the transaction date
+        days_difference = date_diff(today, transaction_date)
+
+        # Check if it's exactly 2 days or every 10 days
+        if days_difference == 2 or (days_difference > 2 and days_difference % 10 == 0):
+            so_to_notify.append(so)
+
+    if so_to_notify:
+        # Fetch System Managers for email recipients
+        system_managers = frappe.get_all(
+            "Has Role",
+            filters={"role": "System Manager"},
+            fields=["parent"]
+        )
+        recipients = frappe.get_all(
+            "User",
+            filters={"name": ["in", [sm["parent"] for sm in system_managers]], "enabled": 1},
+            fields=["email"]
+        )
+        recipient_list = [user["email"] for user in recipients if user["email"]]
+
+        if not recipient_list:
+            frappe.log_error("No System Managers found to send notifications.")
+            return
+
+        # Prepare email content
+        subject = "Sales Orders With Less Delivered Quantity"
+        message = "<p>The following Sales Orders for Stock or Fixed Asset Items have Delivered Quantity less than Ordered Quantity:</p>"
+        message += "<ul>"
+        for so in so_to_notify:
+            message += f"<li>SO: {so['so_name']} | Date: {so['transaction_date']} | Amount: {so['grand_total']}</li>"
+            message += f"<ul>"
+            message += f"<li>Item: {so['item_name']} | Ordered Qty: {so['ordered_qty']} | Delivered Qty: {so['delivered_qty']}</li>"
+            message += f"<li>Rate: {so['rate']} | Amount: {so['amount']}</li>"
+            message += f"</ul>"
+        message += "</ul>"
+
+        # Send email
+        frappe.sendmail(
+            recipients=recipient_list,
+            subject=subject,
+            message=message
+        )
+
+
+def notify_purchase_orders_with_items_billed_amt_less_than_net_amount():
+    # Today's date
+    today = nowdate()
+
+    # Fetch Purchase Orders where items billed amount < Net Amount
+    po_with_items_billed_amt_less_than_net = frappe.db.sql("""
+        SELECT po.name AS po_name, po.transaction_date, poi.net_amount, 
+               po.grand_total, poi.item_code, poi.item_name, 
+               poi.billed_amt AS billed_amt, poi.qty AS ordered_qty,
+               poi.rate, poi.amount
+        FROM `tabPurchase Order` po
+        INNER JOIN `tabPurchase Order Item` poi ON po.name = poi.parent
+        WHERE po.docstatus = 1
+        AND poi.billed_amt < poi.net_amount
+        
+    """, as_dict=True)
+
+    # Prepare email content for notifications
+    po_to_notify = []
+    for po in po_with_items_billed_amt_less_than_net:
+        transaction_date = po["transaction_date"]
+
+        # Calculate the difference between today and the transaction date
+        days_difference = date_diff(today, transaction_date)
+
+        # Check if it's exactly 2 days or every 10 days
+        if days_difference == 2 or (days_difference > 2 and days_difference % 10 == 0):
+            po_to_notify.append(po)
+
+    if po_to_notify:
+        # Fetch System Managers for email recipients
+        system_managers = frappe.get_all(
+            "Has Role",
+            filters={"role": "System Manager"},
+            fields=["parent"]
+        )
+        recipients = frappe.get_all(
+            "User",
+            filters={"name": ["in", [sm["parent"] for sm in system_managers]], "enabled": 1},
+            fields=["email"]
+        )
+        recipient_list = [user["email"] for user in recipients if user["email"]]
+
+        if not recipient_list:
+            frappe.log_error("No System Managers found to send notifications.")
+            return
+
+        # Prepare email content
+        subject = "Purchase Orders with Items Billed Amount Less Than Net Amount"
+        message = "<p>The following Purchase Orders have items where the billed amount is less than the Net Amount:</p>"
+        message += "<ul>"
+        for po in po_to_notify:
+            message += f"<li>PO: {po['po_name']} | Date: {po['transaction_date']} | Net Amount: {po['net_amount']} | Billed Amount: {po['billed_amt']}</li>"
+            message += f"<ul>"
+            message += f"<li>Item: {po['item_name']} | Ordered Qty: {po['ordered_qty']} | Rate: {po['rate']}</li>"
+            message += f"<li>Amount: {po['amount']}</li>"
+            message += f"</ul>"
+        message += "</ul>"
+
+        # Send email
+        frappe.sendmail(
+            recipients=recipient_list,
+            subject=subject,
+            message=message
+        )
+
+def notify_purchase_invoices_not_paid():
+    # Today's date
+    today = nowdate()
+
+    # Fetch Purchase Invoices where billed amount is greater than the paid amount
+    invoices_not_paid = frappe.db.sql("""
+        SELECT pi.name AS invoice_name, pi.posting_date, pi.grand_total,
+               pi.outstanding_amount, pi.paid_amount, 
+               pii.item_code, pii.item_name, pii.qty, pii.rate, pii.amount
+        FROM `tabPurchase Invoice` pi
+        INNER JOIN `tabPurchase Invoice Item` pii ON pi.name = pii.parent
+        WHERE pi.docstatus = 1
+        AND pi.outstanding_amount > 0  -- This ensures there is outstanding payment
+    """, as_dict=True)
+
+    # Prepare email content for notifications
+    invoices_to_notify = []
+    for invoice in invoices_not_paid:
+        posting_date = invoice["posting_date"]
+
+        # Calculate the difference between today and the posting date
+        days_difference = date_diff(today, posting_date)
+
+        # Check if it's exactly 2 days or every 10 days
+        if days_difference == 2 or (days_difference > 2 and days_difference % 10 == 0):
+            invoices_to_notify.append(invoice)
+
+    if invoices_to_notify:
+        # Fetch System Managers for email recipients
+        system_managers = frappe.get_all(
+            "Has Role",
+            filters={"role": "System Manager"},
+            fields=["parent"]
+        )
+        recipients = frappe.get_all(
+            "User",
+            filters={"name": ["in", [sm["parent"] for sm in system_managers]], "enabled": 1},
+            fields=["email"]
+        )
+        recipient_list = [user["email"] for user in recipients if user["email"]]
+
+        if not recipient_list:
+            frappe.log_error("No System Managers found to send notifications.")
+            return
+
+        # Prepare email content
+        subject = "Purchase Invoices Not Paid"
+        message = "<p>The following Purchase Invoices have outstanding amounts (unpaid):</p>"
+        message += "<ul>"
+        for invoice in invoices_to_notify:
+            message += f"<li>Invoice: {invoice['invoice_name']} | Date: {invoice['posting_date']} | Total: {invoice['grand_total']} | Outstanding: {invoice['outstanding_amount']}</li>"
+            message += f"<ul>"
+            message += f"<li>Item: {invoice['item_name']} | Ordered Qty: {invoice['qty']} | Rate: {invoice['rate']}</li>"
+            message += f"<li>Amount: {invoice['amount']}</li>"
+            message += f"</ul>"
+        message += "</ul>"
+
+        # Send email
+        frappe.sendmail(
+            recipients=recipient_list,
+            subject=subject,
+            message=message
+        )
+
+
+def notify_purchase_orders_without_receipts():
+    # Today's date
+    today = nowdate()
+
+    # Fetch Purchase Orders with Stock/Fixed Asset Items and Received Quantity < Ordered Quantity
+    po_without_receipts = frappe.db.sql("""
+        SELECT po.name AS po_name, po.transaction_date, po.grand_total,
+               poi.item_code, poi.item_name, poi.qty AS ordered_qty, 
+               poi.received_qty, poi.rate, poi.amount
+        FROM `tabPurchase Order` po
+        INNER JOIN `tabPurchase Order Item` poi ON po.name = poi.parent
+        WHERE po.docstatus = 1
+        AND poi.qty > (poi.received_qty + poi.returned_qty) 
+        AND poi.item_code IN (
+            SELECT name FROM `tabItem`
+            WHERE is_stock_item = 1 OR is_fixed_asset = 1
+        )
+    """, as_dict=True)
+
+    # Prepare email content for notifications
+    po_to_notify = []
+    for po in po_without_receipts:
+        transaction_date = po["transaction_date"]
+
+        # Calculate the difference between today and the transaction date
+        days_difference = date_diff(today, transaction_date)
+
+        # Check if it's exactly 2 days or every 10 days
+        if days_difference == 2 or (days_difference > 2 and days_difference % 10 == 0):
+            po_to_notify.append(po)
+
+    if po_to_notify:
+        # Fetch System Managers for email recipients
+        system_managers = frappe.get_all(
+            "Has Role",
+            filters={"role": "System Manager"},
+            fields=["parent"]
+        )
+        recipients = frappe.get_all(
+            "User",
+            filters={"name": ["in", [sm["parent"] for sm in system_managers]], "enabled": 1},
+            fields=["email"]
+        )
+        recipient_list = [user["email"] for user in recipients if user["email"]]
+
+        if not recipient_list:
+            frappe.log_error("No System Managers found to send notifications.")
+            return
+
+        # Prepare email content
+        subject = "Purchase Orders With Less Received Quantity"
+        message = "<p>The following Purchase Orders for Stock or Fixed Asset Items have Received Quantity less than Ordered Quantity:</p>"
+        message += "<ul>"
+        for po in po_to_notify:
+            message += f"<li>PO: {po['po_name']} | Date: {po['transaction_date']} | Amount: {po['grand_total']}</li>"
+            message += f"<ul>"
+            message += f"<li>Item: {po['item_name']} | Ordered Qty: {po['ordered_qty']} | Received Qty: {po['received_qty']}</li>"
+            message += f"<li>Rate: {po['rate']} | Amount: {po['amount']}</li>"
+            message += f"</ul>"
+        message += "</ul>"
+
+        # Send email
+        frappe.sendmail(
+            recipients=recipient_list,
+            subject=subject,
+            message=message
+        )
+
+
 
 
 @frappe.whitelist()
@@ -256,8 +664,6 @@ def transfer_expired_batches():
             f"Transferred {batch['balance_qty']} of Item {batch['item_code']} (Batch {batch['batch_no']}) "
             f"from {batch['source_warehouse']} to {custom_warehouse}."
         )
-
-
 
 
 @frappe.whitelist()

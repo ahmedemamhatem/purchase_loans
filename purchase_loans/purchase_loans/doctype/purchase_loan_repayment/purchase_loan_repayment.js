@@ -41,7 +41,8 @@ frappe.ui.form.on('Purchase Loan Repayment', {
             return {
                 filters: {
                     'custom_employee': doc.employee,  // Updated from 'employee' to 'custom_employee'
-                    'outstanding_amount': ['>', 0]
+                    'outstanding_amount': ['>', 0],
+                    'docstatus': ['=', 1]
                 }
             };
         };
