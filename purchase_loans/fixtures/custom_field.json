@@ -2650,7 +2650,7 @@
   "in_standard_filter": 1,
   "insert_after": "set_posting_time",
   "is_system_generated": 0,
-  "is_virtual": 1,
+  "is_virtual": 0,
   "label": "Transaction Unique ID",
   "length": 0,
   "link_filters": null,
