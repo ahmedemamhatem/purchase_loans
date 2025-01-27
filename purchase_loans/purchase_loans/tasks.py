@@ -6,6 +6,116 @@ import random
 import string
 import re
 
+
+# Triggered before deleting a file
+@frappe.whitelist()
+def before_delete_file(doc, method):
+    if doc.attached_to_doctype and doc.attached_to_name:
+        # Get the roles of the current user
+        user_roles = frappe.get_all(
+            "Has Role",
+            filters={"parent": frappe.session.user},
+            fields=["role"]
+        )
+        user_roles = [role["role"] for role in user_roles]
+
+        # Check if the user does not have the System Manager role
+        if "System Manager" not in user_roles:
+            frappe.throw(
+                f"You cannot delete this file because it is attached to the document: {doc.attached_to_doctype} {doc.attached_to_name}. Please contact a System Manager to delete it.",
+                frappe.PermissionError
+            )
+
+
+@frappe.whitelist()
+def copy_attachments_to_target(target_doctype, target_docname, source_doctype, transaction_unique_id_field="custom_transaction_unique_id"):
+    """
+    Copies all attachments from a source doctype to a target doctype based on a shared Transaction Unique ID.
+    Before inserting, it checks if the file is already attached to the target document.
+
+    Args:
+        target_doctype (str): The target doctype to attach files to (e.g., "Purchase Invoice").
+        target_docname (str): The target document name to attach files to.
+        source_doctype (str): The source doctype to fetch attachments from (e.g., "Purchase Order").
+        transaction_unique_id_field (str): The field name for the Transaction Unique ID (default: "custom_transaction_unique_id").
+
+    Raises:
+        frappe.ValidationError: If the source document or attachments are not found.
+    """
+    try:
+        # Fetch the target document
+        target_doc = frappe.get_doc(target_doctype, target_docname)
+
+        # Ensure the target document has a Transaction Unique ID
+        transaction_unique_id = getattr(target_doc, transaction_unique_id_field, None)
+        if not transaction_unique_id:
+            frappe.throw(
+                _(f"Transaction Unique ID ({transaction_unique_id_field}) is missing in the {target_doctype}: {target_docname}")
+            )
+
+        # Find the source documents with the same Transaction Unique ID
+        source_docs = frappe.get_all(
+            source_doctype,
+            filters={transaction_unique_id_field: transaction_unique_id},
+            fields=["name"]
+        )
+
+        if not source_docs:
+            frappe.throw(
+                _(f"No {source_doctype} found with the same Transaction Unique ID: {transaction_unique_id}")
+            )
+
+        # Fetch the first matching source document (adjust this if multiple matches are expected)
+        source_docname = source_docs[0].get("name")
+
+        # Get all attachments linked to the source document
+        attachments = frappe.get_all(
+            "File",
+            filters={"attached_to_doctype": source_doctype, "attached_to_name": source_docname},
+            fields=["file_url", "file_name"]
+        )
+
+        if not attachments:
+            frappe.msgprint(_(f"No attachments found in the related {source_doctype}: {source_docname}"))
+            return
+
+        # Attach files to the target document
+        for attachment in attachments:
+            # Check if the file is already attached to the target document
+            existing_attachment = frappe.get_all(
+                "File",
+                filters={
+                    "attached_to_doctype": target_doctype,
+                    "attached_to_name": target_docname,
+                    "file_url": attachment["file_url"],
+                    "file_name": attachment["file_name"]
+                },
+                fields=["name"]
+            )
+
+            if existing_attachment:
+                frappe.msgprint(_(f"File {attachment['file_name']} already attached to {target_doctype}: {target_docname}"))
+                continue  # Skip if file is already attached
+
+            # If file is not attached, add it
+            frappe.get_doc({
+                "doctype": "File",
+                "file_url": attachment["file_url"],
+                "file_name": attachment["file_name"],
+                "attached_to_doctype": target_doctype,
+                "attached_to_name": target_docname
+            }).insert(ignore_permissions=True)
+
+        frappe.msgprint(
+            _(f"Attachments copied successfully from {source_doctype} ({source_docname}) to {target_doctype} ({target_docname})")
+        )
+
+    except Exception as e:
+        frappe.log_error(f"Error in copying attachments: {str(e)}")
+        frappe.throw(_("An error occurred while copying attachments."))
+
+
+
 def notify_purchase_order_and_invoice_issues():
 
     notify_sales_orders_without_delivery()
@@ -413,8 +523,6 @@ def notify_purchase_orders_without_receipts():
         )
 
 
-
-
 @frappe.whitelist()
 def validate_patch(self):
     self.flags.ignore_submit_comment = True
@@ -665,53 +773,6 @@ def transfer_expired_batches():
             f"from {batch['source_warehouse']} to {custom_warehouse}."
         )
 
-
-@frappe.whitelist()
-def validate_sales_order(doc, method):
-    for item in doc.items:
-        # Fetch the company's custom role
-        company_record = frappe.get_doc("Company", doc.company)
-        required_role = company_record.custom_role
-
-        # Check if the item is a stock item or a fixed asset
-        is_stock_item = frappe.db.get_value("Item", item.item_code, "is_stock_item")
-        is_fixed_asset = frappe.db.get_value("Item", item.item_code, "is_fixed_asset")
-
-        # Get the roles of the currently logged-in user
-        user_roles = frappe.get_roles(frappe.session.user)
-
-        # Restrict users with the required role from creating orders for stock or fixed asset items
-        if (is_stock_item == 1 or is_fixed_asset == 1) and required_role in user_roles and frappe.session.user != "Administrator":
-            frappe.throw("You cannot create orders for stock or fixed asset items.")
-
-        # If the item is a stock item, check stock availability
-        if is_stock_item == 1:
-            # Use SQL to get the total actual quantity and reserved quantity for the item across all warehouses
-            result = frappe.db.sql(
-                """
-                SELECT SUM(actual_qty) as actual_qty, SUM(reserved_qty) as reserved_qty
-                FROM `tabBin` 
-                WHERE item_code = %s
-                """,
-                (item.item_code,)
-            )
-
-            # Get actual_qty and reserved_qty from the result or set them to 0 if no data is found
-            total_qty = result[0][0] if result else 0
-            reserved_qty = result[0][1] if result else 0
-
-            # Calculate available quantity
-            available_qty = total_qty - reserved_qty
-
-            # Check if available quantity is less than the ordered quantity
-            if available_qty < item.qty:
-                frappe.throw(
-                    f"Insufficient stock for Item {item.item_code}.<br>"
-                    f"<b>Available Quantity:</b> {total_qty} <b>(Available after Reservations: {available_qty}, Reserved: {reserved_qty})</b><br>"
-                    f"<b>Ordered Quantity:</b> {item.qty}.<br>"
-                    "You can only sell the Available after Reservations."
-                )
-
             
 @frappe.whitelist()
 def update_purchase_loan_request(purchase_loan_request_name):
@@ -786,112 +847,6 @@ def update_purchase_loan_request(purchase_loan_request_name):
 
     # Commit changes to the database
     frappe.db.commit()
-
-
-@frappe.whitelist()
-def add_id_to_purchase_order(doc, method):
-    
-    for item in doc.items:
-        # Fetch the company's custom role
-        company_record = frappe.get_doc("Company", doc.company)
-        required_role = company_record.custom_role
-
-        # Check if the item is a stock item or a fixed asset
-        is_stock_item = frappe.db.get_value("Item", item.item_code, "is_stock_item")
-        is_fixed_asset = frappe.db.get_value("Item", item.item_code, "is_fixed_asset")
-
-        # Get the roles of the currently logged-in user
-        user_roles = frappe.get_roles(frappe.session.user)
-
-        # Restrict users with the required role from creating orders for stock or fixed asset items
-        if (is_stock_item == 1 or is_fixed_asset == 1) and required_role in user_roles and frappe.session.user != "Administrator":
-            frappe.throw("You cannot create orders for stock or fixed asset items.")
-
-    if not doc.custom_transaction_unique_id:
-        # Query the existing Purchase Orders to find the highest unique ID
-        existing_ids = frappe.db.get_all('Purchase Order', filters={'custom_transaction_unique_id': ['like', 'ORD-%']}, fields=['custom_transaction_unique_id'])
-        
-        # Extract the numerical part and find the highest number
-        highest_num = 0
-        for record in existing_ids:
-            match = re.search(r'ORD-(\d{8})$', record.custom_transaction_unique_id)  # Match 8-digit numbers only
-            if match:
-                num = int(match.group(1))
-                if num > highest_num:
-                    highest_num = num
-        
-        # Increment the highest number found or start with 1 if none found
-        new_num = highest_num + 1 if highest_num > 0 else 1
-        
-        # Generate the unique ID with the new number
-        unique_id = f"ORD-{new_num:08d}"  # Padded to ensure 8 digits
-        
-        # Set the generated ID to the custom field
-        doc.custom_transaction_unique_id = unique_id
-
-
-@frappe.whitelist()
-def add_id_to_purchase_invoice(doc, method):
-    try:
-        if doc.items:
-            for m in doc.items:
-                # Ensure that purchase_order is present
-                if m.purchase_order:
-                    # Fetch the Purchase Order document
-                    purchase_order = frappe.get_doc("Purchase Order", m.purchase_order)
-                    
-                    # Check if custom_transaction_unique_id exists in the Purchase Order
-                    if purchase_order.custom_transaction_unique_id:
-                        # Assign the ID from the Purchase Order to the Purchase Invoice
-                        doc.custom_transaction_unique_id = purchase_order.custom_transaction_unique_id
-                        break  # Once we set the ID, we can stop the loop as it's assumed to be unique
-                    else:
-                        # Optionally, handle the case where there is no ID on the Purchase Order
-                        frappe.throw(_("Custom Transaction Unique ID not found on Purchase Order: {0}".format(m.purchase_order)))
-        
-    except Exception as e:
-        # Log and throw any unexpected errors
-        frappe.log_error(f"Error assigning custom_transaction_unique_id to Purchase Invoice {doc.name}: {str(e)}")
-        frappe.throw(_("Error assigning unique ID"))
-
-
-@frappe.whitelist()
-def validate_payment_entry(doc, method):
-    try:
-        if not doc.references:
-            frappe.throw(_("No references found in the Payment Entry"))
-        
-        total_allocated_amount = 0
-        total_outstanding_amount = 0
-        total_outstanding_amount_net = 0
-        custom_transaction_unique_id = None
-
-        for ref in doc.references:
-            invoice = frappe.get_doc(ref.reference_doctype, ref.reference_name)
-            currency = invoice.currency
-            account =  invoice.credit_to if ref.reference_doctype == "Purchase Invoice" else   invoice.debit_to
-            account = frappe.get_doc("Account", account)
-            account_currency = account.account_currency
-            total_outstanding_amount = invoice.outstanding_amount 
-            if invoice.doctype == "Purchase Invoice" and not custom_transaction_unique_id:
-                custom_transaction_unique_id = invoice.custom_transaction_unique_id
-                doc.custom_transaction_unique_id = custom_transaction_unique_id
-
-            if doc.payment_type == "Pay" and doc.paid_from_account_currency != currency:
-                frappe.throw(_("Currency mismatch: The currency of the payment account does not match the currency of the invoice"))
-
-            ref.allocated_amount = doc.paid_amount * doc.source_exchange_rate if account_currency != currency else doc.paid_amount
-            total_allocated_amount += ref.allocated_amount
-            total_outstanding_amount_net += total_outstanding_amount
-
-        doc.total_allocated_amount = total_allocated_amount
-
-        # if doc.total_allocated_amount > total_outstanding_amount_net:
-        #     frappe.throw(_("Paid amount exceeds the total allocated amount"))
-
-    except Exception as e:
-        frappe.log_error(f"Error in Payment Entry {doc.name}: {str(e)}")
-        frappe.throw(_("An error occurred while validating the payment entry"))
 
 
 @frappe.whitelist()

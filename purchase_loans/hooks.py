@@ -34,19 +34,31 @@ doc_events = {
         "on_submit": "purchase_loans.purchase_loans.tasks.update_purchase_loan_request_on_submit"
     },
     "Payment Entry": {
-        "validate": "purchase_loans.purchase_loans.tasks.validate_payment_entry"
+        "validate": "purchase_loans.task.payment_entry.validate_payment_entry"
     },
     "Batch": {
         "validate": "purchase_loans.purchase_loans.tasks.transfer_expired_batch_on_validate"
     },
     "Sales Order": {
-        "validate": "purchase_loans.purchase_loans.tasks.validate_sales_order"
+        "validate": "purchase_loans.task.sales_order.validate_sales_order"
     },
     "Purchase Order": {
-        "validate": "purchase_loans.purchase_loans.tasks.add_id_to_purchase_order"
+        "validate": "purchase_loans.task.purchase_order.validate_purchase_order"
     },
     "Purchase Invoice": {
-        "validate": "purchase_loans.purchase_loans.tasks.add_id_to_purchase_invoice"
+        "validate": "purchase_loans.task.purchase_invoice.validate_purchase_invoice"
+    },
+    "Sales Invoice": {
+        "validate": "purchase_loans.task.sales_invoice.validate_sales_invoice"
+    },
+    "Purchase Receipt": {
+        "validate": "purchase_loans.task.stock_transaction.validate_purchase_receipt"
+    },
+    "Delivery Note": {
+        "validate": "purchase_loans.task.stock_transaction.validate_delivery_note"
+    },
+    "File": {
+        "on_trash": "purchase_loans.purchase_loans.tasks.before_delete_file"
     }
 }
 
