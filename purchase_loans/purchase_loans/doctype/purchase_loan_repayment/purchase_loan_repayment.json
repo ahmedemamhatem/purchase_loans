@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "PLRP-.{employee}.-.#####",
+ "autoname": ".{purchase_loan_request}.-.##",
  "creation": "2024-11-06 13:25:26.191771",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -206,7 +206,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-01-08 14:44:22.979717",
+ "modified": "2025-01-28 09:41:12.143657",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Repayment",
