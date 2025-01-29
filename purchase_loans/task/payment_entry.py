@@ -5,6 +5,9 @@ from frappe import _
 import random
 import string
 import re
+from purchase_loans.purchase_loans.tasks import copy_attachments_to_target
+
+
 
 @frappe.whitelist()
 def validate_payment_entry(doc, method):
@@ -27,8 +30,10 @@ def validate_payment_entry(doc, method):
             # Determine the account to validate
             account = None
             if ref.reference_doctype == "Purchase Invoice":
+                source_doctype = "Purchase Order"
                 account = invoice.credit_to
             elif ref.reference_doctype == "Sales Invoice":
+                source_doctype = "Sales Order"
                 account = invoice.debit_to
 
             # Fetch account currency if the account exists
@@ -68,6 +73,9 @@ def validate_payment_entry(doc, method):
             frappe.throw(
                 _("Paid amount exceeds the total outstanding amount for the referenced invoices.")
             )
+        
+        if not doc.is_new() and source_doctype and doc.custom_transaction_unique_id:
+            copy_attachments_to_target(doc.doctype, doc.name, source_doctype)
 
     except Exception as e:
         # Log the error and raise a generic error message

@@ -5,6 +5,8 @@ from frappe import _
 import random
 import string
 import re
+from purchase_loans.purchase_loans.tasks import copy_attachments_to_target
+
 
 @frappe.whitelist()
 def validate_purchase_invoice(doc, method):
@@ -24,7 +26,8 @@ def validate_purchase_invoice(doc, method):
                     else:
                         # Optionally, handle the case where there is no ID on the Purchase Order
                         frappe.msgprint(_("Custom Transaction Unique ID not found on Purchase Order: {0}".format(m.purchase_order)))
-        
+        if not doc.is_new() and doc.custom_transaction_unique_id:
+            copy_attachments_to_target(doc.doctype, doc.name, "Purchase Order")
     except Exception as e:
         # Log and throw any unexpected errors
         frappe.log_error(f"Error assigning custom_transaction_unique_id to Purchase Invoice {doc.name}: {str(e)}")
