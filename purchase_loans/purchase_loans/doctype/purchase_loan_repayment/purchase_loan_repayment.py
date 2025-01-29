@@ -3,6 +3,8 @@ from frappe import _
 from frappe.model.document import Document
 from purchase_loans.purchase_loans.tasks import create_purchase_loan_ledger
 
+
+
 class PurchaseLoanRepayment(Document):
     def on_cancel(self):
         # Fetch all Journal Entries linked to this Purchase Loan Repayment
@@ -36,7 +38,81 @@ class PurchaseLoanRepayment(Document):
         if self.purchase_loan_repayment_invoices:
             self._create_journal_entry_for_invoices()
 
+    @frappe.whitelist()
+    def _copy_attachments_to_target(self, target_doctype, target_docname, source_doctype, source_name):
+        """
+        Copies all attachments from a source doctype to a target doctype based on a shared Transaction Unique ID.
+        Before inserting, it checks if the file is already attached to the target document.
 
+        Args:
+            target_doctype (str): The target doctype to attach files to (e.g., "Purchase Invoice").
+            target_docname (str): The target document name to attach files to.
+            source_doctype (str): The source doctype to fetch attachments from (e.g., "Purchase Order").
+            source_name (str): The source document name.
+
+        Raises:
+            frappe.ValidationError: If the source document or attachments are not found.
+        """
+        try:
+            # Fetch the target document
+            target_doc = frappe.get_doc(target_doctype, target_docname)
+
+            # Find the source documents with the same Transaction Unique ID
+            source_docs = frappe.get_all(
+                source_doctype,
+                filters={"name": source_name},
+                fields=["name"]
+            )
+
+            if not source_docs:
+                frappe.throw(
+                    _(f"No {source_doctype} found with the name: {source_name}")
+                )
+
+            # Fetch the first matching source document (adjust if multiple matches are expected)
+            source_docname = source_docs[0].get("name")
+
+            # Get all attachments linked to the source document
+            attachments = frappe.get_all(
+                "File",
+                filters={"attached_to_doctype": source_doctype, "attached_to_name": source_docname},
+                fields=["file_url", "file_name"]
+            )
+
+            if not attachments:
+                return
+
+            # Attach files to the target document
+            for attachment in attachments:
+                # Check if the file is already attached to the target document
+                existing_attachment = frappe.get_all(
+                    "File",
+                    filters={
+                        "attached_to_doctype": target_doctype,
+                        "attached_to_name": target_docname,
+                        "file_url": attachment["file_url"],
+                        "file_name": attachment["file_name"]
+                    },
+                    fields=["name"]
+                )
+
+                if existing_attachment:
+                    
+                    continue  # Skip if file is already attached
+
+                # If file is not attached, add it
+                frappe.get_doc({
+                    "doctype": "File",
+                    "file_url": attachment["file_url"],
+                    "file_name": attachment["file_name"],
+                    "attached_to_doctype": target_doctype,
+                    "attached_to_name": target_docname
+                }).insert(ignore_permissions=True)
+
+        except Exception as e:
+            frappe.log_error(f"Error in copying attachments: {str(e)}")
+            
+            
     def _create_journal_entry_for_expenses(self):
         """Creates a journal entry for other expenses in the loan repayment."""
 
@@ -78,8 +154,13 @@ class PurchaseLoanRepayment(Document):
         # Insert and submit the journal entry in one go
         journal_entry.insert(ignore_permissions=True)
         journal_entry.submit()
+
         create_purchase_loan_ledger(journal_entry, ledger_amount)
         self.db_update()
+
+        self._copy_attachments_to_target("Journal Entry", journal_entry.name, self.doctype, self.name)
+
+        
 
     def _create_journal_entry_for_invoices(self):
         """Creates journal entries for loan repayment invoices and handles exchange differences."""
@@ -220,11 +301,18 @@ class PurchaseLoanRepayment(Document):
         for journal_entry in journal_entries:
             journal_entry.insert(ignore_permissions=True)
             journal_entry.submit()
+
             create_purchase_loan_ledger(journal_entry, ledger_amount)
+
+            self._copy_attachments_to_target("Journal Entry", journal_entry.name, self.doctype, self.name)
+
+            
 
         for exchange_difference_entry in exchange_difference_entries:
             exchange_difference_entry.insert(ignore_permissions=True)
             exchange_difference_entry.submit()
+
+            self._copy_attachments_to_target("Journal Entry", exchange_difference_entry.name, self.doctype, self.name)
 
         # Update loan repayment document
         self.db_update()

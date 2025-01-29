@@ -69,6 +69,82 @@ class PurchaseLoanRequest(Document):
 
 
 
+@frappe.whitelist()
+def copy_attachments_to_target(target_doctype, target_docname, source_doctype, source_name):
+    """
+    Copies all attachments from a source doctype to a target doctype based on a shared Transaction Unique ID.
+    Before inserting, it checks if the file is already attached to the target document.
+
+    Args:
+        target_doctype (str): The target doctype to attach files to (e.g., "Purchase Invoice").
+        target_docname (str): The target document name to attach files to.
+        source_doctype (str): The source doctype to fetch attachments from (e.g., "Purchase Order").
+        source_name (str): The source document name.
+
+    Raises:
+        frappe.ValidationError: If the source document or attachments are not found.
+    """
+    try:
+        # Fetch the target document
+        target_doc = frappe.get_doc(target_doctype, target_docname)
+
+        # Find the source documents with the same Transaction Unique ID
+        source_docs = frappe.get_all(
+            source_doctype,
+            filters={"name": source_name},
+            fields=["name"]
+        )
+
+        if not source_docs:
+            frappe.throw(
+                _(f"No {source_doctype} found with the name: {source_name}")
+            )
+
+        # Fetch the first matching source document (adjust if multiple matches are expected)
+        source_docname = source_docs[0].get("name")
+
+        # Get all attachments linked to the source document
+        attachments = frappe.get_all(
+            "File",
+            filters={"attached_to_doctype": source_doctype, "attached_to_name": source_docname},
+            fields=["file_url", "file_name"]
+        )
+
+        if not attachments:
+            frappe.msgprint(_(f"No attachments found in the related {source_doctype}: {source_docname}"))
+            return
+
+        # Attach files to the target document
+        for attachment in attachments:
+            # Check if the file is already attached to the target document
+            existing_attachment = frappe.get_all(
+                "File",
+                filters={
+                    "attached_to_doctype": target_doctype,
+                    "attached_to_name": target_docname,
+                    "file_url": attachment["file_url"],
+                    "file_name": attachment["file_name"]
+                },
+                fields=["name"]
+            )
+
+            if existing_attachment:
+                
+                continue  # Skip if file is already attached
+
+            # If file is not attached, add it
+            frappe.get_doc({
+                "doctype": "File",
+                "file_url": attachment["file_url"],
+                "file_name": attachment["file_name"],
+                "attached_to_doctype": target_doctype,
+                "attached_to_name": target_docname
+            }).insert(ignore_permissions=True)
+
+    except Exception as e:
+        frappe.log_error(f"Error in copying attachments: {str(e)}")
+        frappe.throw(_("An error occurred while copying attachments."))
+
 
 @frappe.whitelist()
 def get_conversion_rate(self):
@@ -239,6 +315,9 @@ def _create_journal_entry(purchase_loan_request_doc, payment_amount, company, em
     })
     journal_entry.insert(ignore_permissions=True)
     journal_entry.submit()
+
+    copy_attachments_to_target("Journal Entry", journal_entry.name, purchase_loan_request_doc.doctype, purchase_loan_request_doc.name)
+
     create_purchase_loan_ledger(journal_entry, ledger_amount)
     return journal_entry
 

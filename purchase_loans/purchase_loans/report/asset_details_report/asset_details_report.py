@@ -12,7 +12,7 @@ def execute(filters=None):
 
 def get_columns():
     return [
-        {"label": "Asset Name", "fieldname": "asset_name", "fieldtype": "Data", "width": 200},
+        {"label": "Asset Name", "fieldname": "asset_name", "fieldtype": "Data", "width": 200, "scrollCollapse": "true"},
         {"label": "Item Name", "fieldname": "item_name", "fieldtype": "Data", "width": 200},
         {"label": "Asset Category", "fieldname": "asset_category", "fieldtype": "Link", "options": "Asset Category", "width": 150},
         {"label": "Asset Status", "fieldname": "status", "fieldtype": "Select", "width": 150},
@@ -21,11 +21,11 @@ def get_columns():
         {"label": "Location", "fieldname": "location", "fieldtype": "Data", "width": 200},
         {"label": "Custodian (Full Name)", "fieldname": "custodian_full_name", "fieldtype": "Data", "width": 200},
         {"label": "Department", "fieldname": "department", "fieldtype": "Link", "options": "Department", "width": 200},
-        {"label": "Asset Value", "fieldname": "gross_purchase_amount", "fieldtype": "Currency", "width": 150},
         {"label": "Additional Asset Cost", "fieldname": "additional_asset_cost", "fieldtype": "Currency", "width": 150},
         {"label": "Total Asset Cost", "fieldname": "total_asset_cost", "fieldtype": "Currency", "width": 150},
-        
+        {"label": "Asset Value", "fieldname": "gross_purchase_amount", "fieldtype": "Currency", "width": 150},
     ]
+
 
 
 def get_data(filters):

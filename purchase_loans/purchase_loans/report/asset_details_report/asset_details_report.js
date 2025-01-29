@@ -37,3 +37,16 @@ frappe.query_reports["Asset Details Report"] = {
 		}
 	]
 };
+
+frappe.query_reports["Asset Details Report"] = {
+    "onload": function (report) {
+        setTimeout(() => {
+            $(".dt-header").css({
+                "position": "sticky",
+                "top": "0",
+                "background-color": "#fff",
+                "z-index": "1000"
+            });
+        }, 500);
+    }
+};
