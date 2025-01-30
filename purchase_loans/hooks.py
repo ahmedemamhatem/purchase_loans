@@ -39,6 +39,12 @@ doc_events = {
     "Batch": {
         "validate": "purchase_loans.purchase_loans.tasks.transfer_expired_batch_on_validate"
     },
+    "GL Entry": {
+        "validate": "purchase_loans.purchase_loans.tasks.validate_posting_date"
+    },
+    "Stock Ledger Entry": {
+        "validate": "purchase_loans.purchase_loans.tasks.validate_posting_date"
+    },
     "Sales Order": {
         "validate": "purchase_loans.task.sales_order.validate_sales_order"
     },

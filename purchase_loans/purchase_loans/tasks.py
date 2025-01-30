@@ -7,6 +7,13 @@ import string
 import re
 
 
+@frappe.whitelist()
+def validate_posting_date(doc, method):
+    """Validate that posting_date is not in the future."""
+    if doc.posting_date > nowdate():
+        frappe.throw(_("Posting Date cannot be in the future."))
+
+
 # Triggered before deleting a file
 @frappe.whitelist()
 def before_delete_file(doc, method):
