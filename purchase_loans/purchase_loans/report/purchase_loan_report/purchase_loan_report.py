@@ -8,6 +8,7 @@ def get_columns():
     return [
         {"label": _("Purchase Loan Request"), "fieldname": "name", "fieldtype": "Link", "options": "Purchase Loan Request", "width": 250},
         {"label": _("Loan Status"), "fieldname": "status", "fieldtype": "Data", "width": 150},
+        {"label": _("Currency"), "fieldname": "currency", "fieldtype": "Data", "width": 100},
         {"label": _("Payment Status"), "fieldname": "payment_status", "fieldtype": "Data", "width": 150},
         {"label": _("RePayment Status"), "fieldname": "repayment_status", "fieldtype": "Data", "width": 150},
         {"label": _("Posting Date"), "fieldname": "posting_date", "fieldtype": "Date", "width": 150},
@@ -37,6 +38,10 @@ def get_data(filters):
         conditions.append("employee = %(employee)s")
         values["employee"] = filters["employee"]
 
+    if filters.get("currency"):
+        conditions.append("currency = %(currency)s")
+        values["currency"] = filters["currency"]
+
     if filters.get("purchase_loan_request"):
         conditions.append("name = %(purchase_loan_request)s")
         values["purchase_loan_request"] = filters["purchase_loan_request"]
@@ -48,7 +53,7 @@ def get_data(filters):
         SELECT 
             name, posting_date, employee, employee_name, request_amount, outstanding_amount_from_request, 
             overpaid_repayment_amount, paid_amount_from_request, repaid_amount, outstanding_amount_from_repayment, 
-            overpaid_payment_amount,
+            overpaid_payment_amount,currency,
             {status_column} AS status
         FROM 
             `tabPurchase Loan Request`

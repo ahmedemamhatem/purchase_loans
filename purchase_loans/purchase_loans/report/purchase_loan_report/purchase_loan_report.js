@@ -15,6 +15,13 @@ frappe.query_reports["Purchase Loan Report"] = {
             "reqd": 1
         },
         {
+            "fieldname": "currency",
+            "label": __("Currency"),
+            "fieldtype": "Link",
+            "options": "Currency",
+            "reqd": 0
+        },
+        {
             "fieldname": "employee",
             "label": __("Employee"),
             "fieldtype": "Link",
