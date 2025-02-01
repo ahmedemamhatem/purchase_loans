@@ -6,11 +6,11 @@
  "docstatus": 0,
  "doctype": "Report",
  "filters": [],
- "idx": 0,
+ "idx": 1,
  "is_standard": "Yes",
  "json": "{\"columns\":[{\"fieldname\":\"item_code\",\"fieldtype\":\"Link\",\"label\":\"Item\",\"options\":\"Item\",\"width\":100,\"id\":\"item_code\",\"name\":\"Item\",\"editable\":false,\"compareValue\":null},{\"fieldname\":\"item_name\",\"label\":\"Item Name\",\"width\":150,\"id\":\"item_name\",\"name\":\"Item Name\",\"editable\":false,\"compareValue\":null},{\"fieldname\":\"item_group\",\"fieldtype\":\"Link\",\"label\":\"Item Group\",\"options\":\"Item Group\",\"width\":100,\"id\":\"item_group\",\"name\":\"Item Group\",\"editable\":false,\"compareValue\":null},{\"fieldname\":\"warehouse\",\"fieldtype\":\"Link\",\"label\":\"Warehouse\",\"options\":\"Warehouse\",\"width\":100,\"id\":\"warehouse\",\"name\":\"Warehouse\",\"editable\":false,\"compareValue\":null},{\"fieldname\":\"stock_uom\",\"fieldtype\":\"Link\",\"label\":\"Stock UOM\",\"options\":\"UOM\",\"width\":90,\"id\":\"stock_uom\",\"name\":\"Stock UOM\",\"editable\":false,\"compareValue\":null},{\"convertible\":\"qty\",\"fieldname\":\"bal_qty\",\"fieldtype\":\"Float\",\"label\":\"Balance Qty\",\"width\":100,\"id\":\"bal_qty\",\"name\":\"Balance Qty\",\"editable\":false,\"compareValue\":null},{\"convertible\":\"qty\",\"fieldname\":\"opening_qty\",\"fieldtype\":\"Float\",\"label\":\"Opening Qty\",\"width\":100,\"id\":\"opening_qty\",\"name\":\"Opening Qty\",\"editable\":false,\"compareValue\":null},{\"convertible\":\"qty\",\"fieldname\":\"in_qty\",\"fieldtype\":\"Float\",\"label\":\"In Qty\",\"width\":80,\"id\":\"in_qty\",\"name\":\"In Qty\",\"editable\":false,\"compareValue\":null},{\"convertible\":\"qty\",\"fieldname\":\"out_qty\",\"fieldtype\":\"Float\",\"label\":\"Out Qty\",\"width\":80,\"id\":\"out_qty\",\"name\":\"Out Qty\",\"editable\":false,\"compareValue\":null},{\"convertible\":\"qty\",\"fieldname\":\"reserved_stock\",\"fieldtype\":\"Float\",\"label\":\"Reserved Stock\",\"width\":80,\"id\":\"reserved_stock\",\"name\":\"Reserved Stock\",\"editable\":false,\"compareValue\":null},{\"fieldname\":\"company\",\"fieldtype\":\"Link\",\"label\":\"Company\",\"options\":\"Company\",\"width\":100,\"id\":\"company\",\"name\":\"Company\",\"editable\":false,\"compareValue\":null}],\"filters\":{\"company\":\"El Nakheel\",\"from_date\":\"2024-12-28\",\"to_date\":\"2025-01-28\",\"valuation_field_type\":\"Currency\"}}",
  "letterhead": null,
- "modified": "2025-01-28 00:16:07.367062",
+ "modified": "2025-02-01 16:45:47.836694",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Stock Balance Without Values",
@@ -19,13 +19,16 @@
  "ref_doctype": "Stock Ledger Entry",
  "reference_report": "Stock Balance",
  "report_name": "Stock Balance Without Values",
- "report_type": "Custom Report",
+ "report_type": "Script Report",
  "roles": [
   {
    "role": "Stock User"
   },
   {
    "role": "Accounts Manager"
+  },
+  {
+   "role": "Stock Manager"
   }
  ],
  "timeout": 0

@@ -37,7 +37,6 @@ def get_data(filters):
         conditions.append("employee = %(employee)s")
         values["employee"] = filters["employee"]
 
-    # Add condition for the selected Purchase Loan Request filter
     if filters.get("purchase_loan_request"):
         conditions.append("name = %(purchase_loan_request)s")
         values["purchase_loan_request"] = filters["purchase_loan_request"]
@@ -60,6 +59,8 @@ def get_data(filters):
     """
     data = frappe.db.sql(query, values, as_dict=True)
 
+    # Compute payment_status and repayment_status dynamically
+    filtered_data = []
     for row in data:
         row.payment_status = (
             _("Not Paid") if row.paid_amount_from_request == 0 else
@@ -76,4 +77,12 @@ def get_data(filters):
             _("Over RePayment") if row.overpaid_repayment_amount > 0 else ""
         )
 
-    return data
+        # Apply filters on computed fields
+        if filters.get("payment_status") and row.payment_status != filters["payment_status"]:
+            continue
+        if filters.get("repayment_status") and row.repayment_status != filters["repayment_status"]:
+            continue
+
+        filtered_data.append(row)
+
+    return filtered_data

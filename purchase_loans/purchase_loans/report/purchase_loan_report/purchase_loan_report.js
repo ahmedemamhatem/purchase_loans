@@ -4,7 +4,7 @@ frappe.query_reports["Purchase Loan Report"] = {
             "fieldname": "from_date",
             "label": __("From Date"),
             "fieldtype": "Date",
-            "default": frappe.datetime.add_months(frappe.datetime.get_today(), -1),
+            "default": frappe.datetime.add_months(frappe.datetime.get_today(), -12),
             "reqd": 1
         },
         {
@@ -26,6 +26,33 @@ frappe.query_reports["Purchase Loan Report"] = {
             "label": __("Purchase Loan Request"),
             "fieldtype": "Link",
             "options": "Purchase Loan Request",
+            "reqd": 0
+        },
+        {
+            "fieldname": "payment_status",
+            "label": __("Payment Status"),
+            "fieldtype": "Select",
+            "options": [
+                "",
+                "Not Paid",
+                "Partial Paid",
+                "Fully Paid",
+                "Need Over Payment",
+                "Over Payment"
+            ],
+            "reqd": 0
+        },
+        {
+            "fieldname": "repayment_status",
+            "label": __("Repayment Status"),
+            "fieldtype": "Select",
+            "options": [
+                "",
+                "Not Repaid",
+                "Partially Repaid",
+                "Fully Repaid",
+                "Over RePayment"
+            ],
             "reqd": 0
         }
     ]
