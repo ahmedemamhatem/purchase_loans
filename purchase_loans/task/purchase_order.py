@@ -25,7 +25,7 @@ def set_direct_approver(doc):
 @frappe.whitelist()
 def update_old_purchase_orders():
     """Batch update all old Purchase Orders missing approvers."""
-    purchase_orders = frappe.get_all("Purchase Order", filters={"custom_direct_approver_user": ["is", "not set"]})
+    purchase_orders = frappe.get_all("Purchase Order")
 
     for po in purchase_orders:
         doc = frappe.get_doc("Purchase Order", po.name)
