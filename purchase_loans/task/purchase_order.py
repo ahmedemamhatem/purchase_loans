@@ -5,15 +5,38 @@ from frappe import _
 import random
 import string
 import re
+import logging
 
+@frappe.whitelist()
+def set_direct_approver(doc):
+    """Fetch and set the direct approver for the Purchase Order and share the document if not already shared."""
+    if doc.owner != frappe.session.user:
+        return
+
+    approver_user = frappe.db.get_value("Employee", {"user_id": doc.owner}, "custom_purchase_loan_approver")
+    if not approver_user:
+        return
+
+    if not frappe.db.exists("Share", {"doctype": doc.doctype, "docname": doc.name, "user": approver_user}):
+        frappe.share.add(doc.doctype, doc.name, approver_user, read=1, write=1, submit=1)
+        
+
+
+@frappe.whitelist()
+def update_old_purchase_orders():
+    """Batch update all old Purchase Orders missing approvers."""
+    purchase_orders = frappe.get_all("Purchase Order", filters={"custom_direct_approver_user": ["is", "not set"]})
+
+    for po in purchase_orders:
+        doc = frappe.get_doc("Purchase Order", po.name)
+        set_direct_approver(doc)
 
 
 @frappe.whitelist()
 def validate_purchase_order(doc, method):
-    # Check if all items have consistent `is_stock_item` and `is_fixed_asset` values
-    first_item = doc.items[0]
-    first_is_stock_item = frappe.db.get_value("Item", first_item.item_code, "is_stock_item")
-    first_is_fixed_asset = frappe.db.get_value("Item", first_item.item_code, "is_fixed_asset")
+
+    if not doc.is_new():
+        set_direct_approver(doc)
 
     # Fetch the company's custom role
     company_record = frappe.get_doc("Company", doc.company)
@@ -28,11 +51,6 @@ def validate_purchase_order(doc, method):
         if (is_stock_item == 1 or is_fixed_asset == 1) and required_role in user_roles and frappe.session.user != "Administrator":
             frappe.throw("You cannot create orders for stock or fixed asset items.")
 
-        # If the current item's properties don't match the first item's properties, throw an error
-        if is_stock_item != first_is_stock_item or is_fixed_asset != first_is_fixed_asset:
-            frappe.throw(
-                "All items in the Purchase Order must have consistent values for 'Stock Item'  properties."
-            )
 
     # Generate a unique ID for the Purchase Order
     if not doc.custom_transaction_unique_id:

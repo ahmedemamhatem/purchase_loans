@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from purchase_loans.purchase_loans.tasks import create_purchase_loan_ledger
-
+import logging
 
 
 class PurchaseLoanRepayment(Document):
@@ -29,7 +29,10 @@ class PurchaseLoanRepayment(Document):
     def on_submit(self):
         """Creates journal entries upon submission for expenses and invoices."""
         self._validate_repayment_amount()
-  
+        if not self.is_new():
+
+            self._set_direct_approver()
+
         # Create journal entry for other expenses if applicable
         if self.total_other_expenses > 0:
             self._create_journal_entry_for_expenses()
@@ -37,6 +40,15 @@ class PurchaseLoanRepayment(Document):
         # Create journal entry for invoices if there are rows in purchase_loan_repayment_invoices
         if self.purchase_loan_repayment_invoices:
             self._create_journal_entry_for_invoices()
+
+    @frappe.whitelist()
+    def _set_direct_approver(self):
+        """Fetch and set the direct approver for the Purchase Order and share the document if not already shared."""
+        if not self.direct_approver:
+            return
+
+        if not frappe.db.exists("Share", {"doctype": self.doctype, "docname": self.name, "user": self.direct_approver}):
+            frappe.share.add(self.doctype, self.name, self.direct_approver, read=1, write=1, submit=1)
 
     @frappe.whitelist()
     def _copy_attachments_to_target(self, target_doctype, target_docname, source_doctype, source_name):

@@ -5,6 +5,7 @@ from frappe.utils import now
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 from purchase_loans.purchase_loans.tasks import update_purchase_loan_request, create_purchase_loan_ledger
 from erpnext.setup.utils import get_exchange_rate
+import logging
 
 class PurchaseLoanRequest(Document):
     """
@@ -40,6 +41,9 @@ class PurchaseLoanRequest(Document):
         """
         # Fetch the purchase_loan_account from the Company doctype
         self._fetch_company_configuration()
+        if not self.is_new():
+
+            self._set_direct_approver()
 
         currency = self.has_value_changed("currency")
         if currency:
@@ -66,7 +70,11 @@ class PurchaseLoanRequest(Document):
             frappe.throw(_("Purchase Loan Account not set in the Company for {}").format(self.company))
 
 
-
+    @frappe.whitelist()
+    def _set_direct_approver(self):
+        """Fetch and set the direct approver for the Purchase Order and share the document if not already shared."""
+        if self.direct_approver and not frappe.db.exists("Share", {"doctype": self.doctype, "docname": self.name, "user": self.direct_approver}):
+            frappe.share.add(self.doctype, self.name, self.direct_approver, read=1, write=1, submit=1)
 
 
 @frappe.whitelist()

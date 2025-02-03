@@ -5,10 +5,49 @@ from frappe import _
 import random
 import string
 import re
+import logging
+
+
+@frappe.whitelist()
+def set_direct_approver(doc):
+    """Fetch and set the direct approver for the Sales Order and share the document if not already shared."""
+    if frappe.session.user != doc.owner:
+        return
+
+    employee = frappe.db.get_value("Employee", {"user_id": doc.owner}, ["custom_purchase_loan_approver"], as_dict=True)
+    
+    if not (employee and employee.get("custom_purchase_loan_approver")):
+        logging.error(f"No Direct approver found for the Employee: {doc.owner}")
+        return
+    
+    approver_user = employee["custom_purchase_loan_approver"]
+    approver_full_name = frappe.db.get_value("User", approver_user, "full_name")
+
+    if not approver_full_name:
+        logging.error(f"No full name found for the approver: {approver_user}")
+        return
+
+
+    if not frappe.db.exists("Share", {"doctype": doc.doctype, "docname": doc.name, "user": approver_user}):
+        frappe.share.add(doc.doctype, doc.name, approver_user, read=1, write=1, submit=1)
+
+
+@frappe.whitelist()
+def update_old_sales_orders():
+    """Batch update all old Sales Orders missing approvers."""
+    sales_orders = frappe.get_all("Sales Order", filters={"custom_direct_approver_user": ["is", "not set"]})
+
+    for so in sales_orders:
+        doc = frappe.get_doc("Sales Order", so.name)
+        set_direct_approver(doc)
 
 
 @frappe.whitelist()
 def validate_sales_order(doc, method):
+
+    if not doc.is_new():
+        set_direct_approver(doc)
+
     # Generate custom transaction unique ID if not set
     if not doc.custom_transaction_unique_id:
         existing_ids = frappe.db.get_all(
@@ -32,10 +71,7 @@ def validate_sales_order(doc, method):
         unique_id = f"SORD-{new_num:08d}"
         doc.custom_transaction_unique_id = unique_id
 
-    # Ensure consistency for `is_stock_item` and `is_fixed_asset` across all items
-    first_item = doc.items[0]
-    first_is_stock_item = frappe.db.get_value("Item", first_item.item_code, "is_stock_item")
-    first_is_fixed_asset = frappe.db.get_value("Item", first_item.item_code, "is_fixed_asset")
+
 
     # Validate each item in the Sales Order
     for item in doc.items:
@@ -48,11 +84,7 @@ def validate_sales_order(doc, method):
         is_fixed_asset = frappe.db.get_value("Item", item.item_code, "is_fixed_asset")
         user_roles = frappe.get_roles(frappe.session.user)
 
-        # Ensure all items have the same `is_stock_item` and `is_fixed_asset` values
-        if is_stock_item != first_is_stock_item or is_fixed_asset != first_is_fixed_asset:
-            frappe.throw(
-                "All items in the Sales Order must have consistent values for 'Stock Item' and 'Fixed Asset' properties."
-            )
+        
         # Check role restrictions
         if (is_stock_item == 1 or is_fixed_asset == 1) and required_role in user_roles and frappe.session.user != "Administrator":
             frappe.throw(f"You cannot create orders for stock or fixed asset items for the role '{required_role}'.")

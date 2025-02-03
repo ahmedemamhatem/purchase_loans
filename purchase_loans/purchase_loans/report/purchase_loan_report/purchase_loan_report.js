@@ -1,5 +1,5 @@
 frappe.query_reports["Purchase Loan Report"] = {
-	"filters": [
+    "filters": [
         {
             "fieldname": "from_date",
             "label": __("From Date"),
@@ -38,27 +38,25 @@ frappe.query_reports["Purchase Loan Report"] = {
         {
             "fieldname": "payment_status",
             "label": __("Payment Status"),
-            "fieldtype": "Select",
+            "fieldtype": "MultiSelectList",
             "options": [
-                "",
-                "Not Paid",
-                "Partial Paid",
-                "Fully Paid",
-                "Need Over Payment",
-                "Over Payment"
+                { "value": "Not Paid", "label": __("Not Paid") },
+                { "value": "Partial Paid", "label": __("Partial Paid") },
+                { "value": "Fully Paid", "label": __("Fully Paid") },
+                { "value": "Need Over Payment", "label": __("Need Over Payment") },
+                { "value": "Over Payment", "label": __("Over Payment") }
             ],
             "reqd": 0
         },
         {
             "fieldname": "repayment_status",
             "label": __("Repayment Status"),
-            "fieldtype": "Select",
+            "fieldtype": "MultiSelectList",
             "options": [
-                "",
-                "Not Repaid",
-                "Partially Repaid",
-                "Fully Repaid",
-                "Over RePayment"
+                { "value": "Not Repaid", "label": __("Not Repaid") },
+                { "value": "Partially Repaid", "label": __("Partially Repaid") },
+                { "value": "Fully Repaid", "label": __("Fully Repaid") },
+                { "value": "Over RePayment", "label": __("Over RePayment") }
             ],
             "reqd": 0
         }

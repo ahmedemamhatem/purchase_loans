@@ -68,6 +68,11 @@ doc_events = {
     }
 }
 
+after_migrate = [
+    "purchase_loans.task.purchase_order.update_old_purchase_orders",
+    "purchase_loans.task.sales_order.update_old_sales_orders"
+]
+
 # required_apps = []
 
 # Each item in the list will be shown as an app in the apps page

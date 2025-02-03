@@ -10,7 +10,7 @@ def get_columns():
         {"label": _("Loan Status"), "fieldname": "status", "fieldtype": "Data", "width": 150},
         {"label": _("Currency"), "fieldname": "currency", "fieldtype": "Data", "width": 100},
         {"label": _("Payment Status"), "fieldname": "payment_status", "fieldtype": "Data", "width": 150},
-        {"label": _("RePayment Status"), "fieldname": "repayment_status", "fieldtype": "Data", "width": 150},
+        {"label": _("Repayment Status"), "fieldname": "repayment_status", "fieldtype": "Data", "width": 150},
         {"label": _("Posting Date"), "fieldname": "posting_date", "fieldtype": "Date", "width": 150},
         {"label": _("Employee Name"), "fieldname": "employee_name", "fieldtype": "Data", "width": 150},
         {"label": _("Request Amount"), "fieldname": "request_amount", "fieldtype": "Float", "width": 150},
@@ -53,7 +53,7 @@ def get_data(filters):
         SELECT 
             name, posting_date, employee, employee_name, request_amount, outstanding_amount_from_request, 
             overpaid_repayment_amount, paid_amount_from_request, repaid_amount, outstanding_amount_from_repayment, 
-            overpaid_payment_amount,currency,
+            overpaid_payment_amount, currency,
             {status_column} AS status
         FROM 
             `tabPurchase Loan Request`
@@ -68,24 +68,27 @@ def get_data(filters):
     filtered_data = []
     for row in data:
         row.payment_status = (
-            _("Not Paid") if row.paid_amount_from_request == 0 else
-            _("Partial Paid") if row.outstanding_amount_from_request > 0 else
-            _("Fully Paid") if row.overpaid_payment_amount <= 0 and row.overpaid_repayment_amount <= 0 and row.outstanding_amount_from_request == 0 else
-            _("Need Over Payment") if row.repaid_amount > row.paid_amount_from_request else
-            _("Over Payment") if row.overpaid_payment_amount > 0 else ""
+            "Not Paid" if row.paid_amount_from_request == 0 else
+            "Partial Paid" if row.outstanding_amount_from_request > 0 else
+            "Fully Paid" if row.overpaid_payment_amount <= 0 and row.overpaid_repayment_amount <= 0 and row.outstanding_amount_from_request == 0 else
+            "Need Over Payment" if row.repaid_amount > row.paid_amount_from_request else
+            "Over Payment" if row.overpaid_payment_amount > 0 else ""
         )
 
         row.repayment_status = (
-            _("Not Repaid") if row.repaid_amount == 0 else
-            _("Partially Repaid") if row.outstanding_amount_from_repayment > 0 else
-            _("Fully Repaid") if row.overpaid_repayment_amount <= 0 and row.outstanding_amount_from_repayment == 0 else
-            _("Over RePayment") if row.overpaid_repayment_amount > 0 else ""
+            "Not Repaid" if row.repaid_amount == 0 else
+            "Partially Repaid" if row.outstanding_amount_from_repayment > 0 else
+            "Fully Repaid" if row.overpaid_repayment_amount <= 0 and row.outstanding_amount_from_repayment == 0 else
+            "Over RePayment" if row.overpaid_repayment_amount > 0 else ""
         )
 
-        # Apply filters on computed fields
-        if filters.get("payment_status") and row.payment_status != filters["payment_status"]:
+        # Apply MultiSelect filters
+        selected_payment_statuses = frappe.parse_json(filters.get("payment_status", "[]"))
+        selected_repayment_statuses = frappe.parse_json(filters.get("repayment_status", "[]"))
+
+        if selected_payment_statuses and row.payment_status not in selected_payment_statuses:
             continue
-        if filters.get("repayment_status") and row.repayment_status != filters["repayment_status"]:
+        if selected_repayment_statuses and row.repayment_status not in selected_repayment_statuses:
             continue
 
         filtered_data.append(row)

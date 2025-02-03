@@ -10,7 +10,7 @@ import re
 @frappe.whitelist()
 def validate_posting_date(doc, method):
     """Validate that posting_date is not in the future."""
-    if doc.posting_date > nowdate():
+    if frappe.utils.getdate(doc.posting_date) > frappe.utils.getdate(frappe.utils.today()):
         frappe.throw(_("Posting Date cannot be in the future."))
 
 
@@ -18,6 +18,20 @@ def validate_posting_date(doc, method):
 @frappe.whitelist()
 def before_delete_file(doc, method):
     if doc.attached_to_doctype and doc.attached_to_name:
+        # Restrict deletion if the document is submitted (docstatus == 1)
+        attached_docstatus = frappe.db.get_value(doc.attached_to_doctype, doc.attached_to_name, "docstatus")
+
+        # Restrict deletion if the attached document is submitted (docstatus == 1)
+        if attached_docstatus == 1:
+            frappe.throw(
+                f"You cannot delete this file because it is attached to a submitted document: {doc.attached_to_doctype} {doc.attached_to_name}.",
+                frappe.PermissionError
+            )
+
+        # Allow deletion if the current user is the owner of the file
+        if frappe.session.user == doc.owner:
+            return  # Allow deletion
+
         # Get the roles of the current user
         user_roles = frappe.get_all(
             "Has Role",
@@ -32,6 +46,7 @@ def before_delete_file(doc, method):
                 f"You cannot delete this file because it is attached to the document: {doc.attached_to_doctype} {doc.attached_to_name}. Please contact a System Manager to delete it.",
                 frappe.PermissionError
             )
+
 
 
 @frappe.whitelist()
