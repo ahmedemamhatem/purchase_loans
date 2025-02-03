@@ -11,8 +11,6 @@ import logging
 @frappe.whitelist()
 def set_direct_approver(doc):
     """Fetch and set the direct approver for the Sales Order and share the document if not already shared."""
-    if frappe.session.user != doc.owner:
-        return
 
     employee = frappe.db.get_value("Employee", {"user_id": doc.owner}, ["custom_purchase_loan_approver"], as_dict=True)
     
@@ -26,7 +24,6 @@ def set_direct_approver(doc):
     if not approver_full_name:
         logging.error(f"No full name found for the approver: {approver_user}")
         return
-
 
     if not frappe.db.exists("Share", {"doctype": doc.doctype, "docname": doc.name, "user": approver_user}):
         frappe.share.add(doc.doctype, doc.name, approver_user, read=1, write=1, submit=1)

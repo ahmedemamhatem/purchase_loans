@@ -10,8 +10,6 @@ import logging
 @frappe.whitelist()
 def set_direct_approver(doc):
     """Fetch and set the direct approver for the Purchase Order and share the document if not already shared."""
-    if doc.owner != frappe.session.user:
-        return
 
     approver_user = frappe.db.get_value("Employee", {"user_id": doc.owner}, "custom_purchase_loan_approver")
     if not approver_user:
