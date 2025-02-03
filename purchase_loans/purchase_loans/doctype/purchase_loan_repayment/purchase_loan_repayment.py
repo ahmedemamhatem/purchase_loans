@@ -47,7 +47,7 @@ class PurchaseLoanRepayment(Document):
         if not self.direct_approver:
             return
 
-        if not frappe.db.exists("Share", {"doctype": self.doctype, "docname": self.name, "user": self.direct_approver}):
+        if not frappe.db.exists("DocShare", {"doctype": self.doctype, "docname": self.name, "user": self.direct_approver}):
             frappe.share.add(self.doctype, self.name, self.direct_approver, read=1, write=1, submit=1)
 
     @frappe.whitelist()

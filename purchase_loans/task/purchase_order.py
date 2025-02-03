@@ -15,7 +15,7 @@ def set_direct_approver(doc):
     if not approver_user:
         return
 
-    if not frappe.db.exists("Share", {"doctype": doc.doctype, "docname": doc.name, "user": approver_user}):
+    if not frappe.db.exists("DocShare", {"doctype": doc.doctype, "docname": doc.name, "user": approver_user}):
         frappe.share.add(doc.doctype, doc.name, approver_user, read=1, write=1, submit=1)
         
 
