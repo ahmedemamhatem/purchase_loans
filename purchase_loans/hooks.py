@@ -64,7 +64,7 @@ doc_events = {
         "validate": "purchase_loans.task.stock_transaction.validate_delivery_note"
     },
     "File": {
-        "on_trash": "purchase_loans.purchase_loans.tasks.before_delete_file"
+        "on_trash": "purchase_loans.task.file.before_delete_file"
     }
 }
 
