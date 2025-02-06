@@ -359,7 +359,7 @@ def _create_journal_entry(purchase_loan_request_doc, payment_amount, company, em
     })
     journal_entry.insert(ignore_permissions=True)
     journal_entry.submit()
-
+    purchase_loan_request_doc.reload()
     copy_attachments_to_target("Journal Entry", journal_entry.name, purchase_loan_request_doc.doctype, purchase_loan_request_doc.name)
 
     create_purchase_loan_ledger(journal_entry, ledger_amount)
