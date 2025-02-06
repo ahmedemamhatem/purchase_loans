@@ -1,6 +1,6 @@
 import frappe
 from frappe.utils import nowdate, add_days, date_diff
-from frappe.utils import cint, cstr, flt, get_link_to_form, getdate
+from frappe.utils import cint, cstr, flt, get_link_to_form, getdate, today
 from frappe import _
 import random
 import string
@@ -13,7 +13,7 @@ def validate_transaction_date(doc, method):
     """
     Checks if posting_date or transaction_date is in the future and throws an error.
     """
-    from frappe.utils import today, getdate
+    
 
     # List of possible date fields
     date_fields = ["posting_date", "transaction_date"]

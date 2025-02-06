@@ -3,11 +3,12 @@ import frappe
 from frappe.utils import strip_html_tags
 from frappe import throw, _
 from frappe.model.document import Document
-from frappe.utils import now
+from frappe.utils import now, today, getdate, flt
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 from purchase_loans.purchase_loans.tasks import update_purchase_loan_request, create_purchase_loan_ledger
 from erpnext.setup.utils import get_exchange_rate
 import logging
+
 
 class PurchaseLoanRequest(Document):
     """
@@ -21,7 +22,7 @@ class PurchaseLoanRequest(Document):
         the Purchase Loan Request with the latest aggregate values from the ledger by 
         invoking the `update_purchase_loan_request` function.
         """
-
+        frappe.db.set_value(self.doctype, self.name, "submission_date", getdate(today()))
         update_purchase_loan_request(self.name)
         
     def after_insert(self):
@@ -190,6 +191,12 @@ def pay_to_employee(loan_request, company, employee, mode_of_payment, payment_am
     company_record = frappe.get_doc("Company", purchase_loan_request_doc.company)
     custom_allow_payment_beyond_loan_amount = company_record.custom_allow_payment_beyond_loan_amount
 
+    submission_date = getdate(purchase_loan_request_doc.submission_date)  # Convert to date
+    payment_date = getdate(payment_date)  # Ensure payment_date is also a date
+
+    if submission_date and payment_date < submission_date:
+        frappe.throw(_("Payment date cannot be before the submission date."))
+
     currency = purchase_loan_request_doc.currency 
 
     # Ensure the payment amount is within the outstanding balance
@@ -221,6 +228,16 @@ def create_repay_cash(loan_request, company, employee, mode_of_payment, payment_
     payment_amount = _validate_payment_amount(payment_amount)
     purchase_loan_request = frappe.get_doc("Purchase Loan Request", loan_request)
     company_record = frappe.get_doc("Company", purchase_loan_request.company)
+
+    paid_amount_from_request = flt(purchase_loan_request.paid_amount_from_request)
+    if payment_amount > (paid_amount_from_request):
+        frappe.throw(_("Repayment amount cannot exceed the outstanding loan amount."))
+
+    submission_date = getdate(purchase_loan_request.submission_date)  # Convert to date
+    payment_date = getdate(payment_date)  # Ensure payment_date is also a date
+
+    if submission_date and payment_date < submission_date:
+        frappe.throw(_("Payment date cannot be before the submission date."))
 
     if company_record.custom_allow_repayment_beyond_loan_amount == "No" :
         if payment_amount > purchase_loan_request.outstanding_amount_from_repayment:

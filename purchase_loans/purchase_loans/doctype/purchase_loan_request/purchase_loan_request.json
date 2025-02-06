@@ -15,6 +15,7 @@
   "direct_approver_name",
   "default_account",
   "posting_date",
+  "submission_date",
   "company",
   "column_break_fdpw",
   "request_amount",
@@ -238,6 +239,14 @@
    "label": "Closed",
    "no_copy": 1,
    "read_only": 1
+  },
+  {
+   "fieldname": "submission_date",
+   "fieldtype": "Date",
+   "in_global_search": 1,
+   "label": "Submission Date",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -252,7 +261,7 @@
    "link_fieldname": "purchase_loan_request"
   }
  ],
- "modified": "2025-01-23 18:08:23.352760",
+ "modified": "2025-02-06 15:46:34.951067",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Request",
