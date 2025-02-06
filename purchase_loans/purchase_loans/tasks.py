@@ -7,6 +7,24 @@ import string
 import re
 
 
+
+@frappe.whitelist()
+def validate_transaction_date(doc, method):
+    """
+    Checks if posting_date or transaction_date is in the future and throws an error.
+    """
+    from frappe.utils import today, getdate
+
+    # List of possible date fields
+    date_fields = ["posting_date", "transaction_date"]
+
+    for field in date_fields:
+        if hasattr(doc, field) and doc.get(field):
+            if getdate(doc.get(field)) > getdate(today()):
+                field_label = frappe.get_meta(doc.doctype).get_field(field).label
+                frappe.throw(_("You can't insert a record with '{0}' in the future.").format(field_label))
+
+
 @frappe.whitelist()
 def validate_posting_date(doc, method):
     """Validate that posting_date is not in the future."""

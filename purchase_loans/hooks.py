@@ -29,6 +29,10 @@ scheduler_events = {
 }
 
 doc_events = {
+
+     "*": {
+        "validate": "purchase_loans.purchase_loans.tasks.validate_transaction_date"
+    },
     "Journal Entry": {
         "validate": "purchase_loans.task.journal_entry.validate_journal_entry",
         "on_cancel": "purchase_loans.task.journal_entry.update_purchase_loan_request_on_cancel",
@@ -37,6 +41,7 @@ doc_events = {
     "Payment Entry": {
         "validate": "purchase_loans.task.payment_entry.validate_payment_entry"
     },
+   
     "Batch": {
         "validate": "purchase_loans.purchase_loans.tasks.transfer_expired_batch_on_validate"
     },
