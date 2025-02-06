@@ -62,7 +62,7 @@
   {
    "default": "Today",
    "fieldname": "posting_date",
-   "fieldtype": "Data",
+   "fieldtype": "Date",
    "label": "Posting Date",
    "reqd": 1
   },
@@ -232,7 +232,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-02-06 13:01:12.835570",
+ "modified": "2025-02-06 16:11:58.019677",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Repayment",
