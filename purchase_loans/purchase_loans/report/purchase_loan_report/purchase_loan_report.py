@@ -12,6 +12,7 @@ def get_columns():
         {"label": _("Payment Status"), "fieldname": "payment_status", "fieldtype": "Data", "width": 150},
         {"label": _("Repayment Status"), "fieldname": "repayment_status", "fieldtype": "Data", "width": 150},
         {"label": _("Posting Date"), "fieldname": "posting_date", "fieldtype": "Date", "width": 150},
+        {"label": _("Employee ID"), "fieldname": "employee", "fieldtype": "Link", "options": "Employee", "width": 150},
         {"label": _("Employee Name"), "fieldname": "employee_name", "fieldtype": "Data", "width": 150},
         {"label": _("Request Amount"), "fieldname": "request_amount", "fieldtype": "Float", "width": 150},
         {"label": _("Paid Amount From Request"), "fieldname": "paid_amount_from_request", "fieldtype": "Float", "width": 250},

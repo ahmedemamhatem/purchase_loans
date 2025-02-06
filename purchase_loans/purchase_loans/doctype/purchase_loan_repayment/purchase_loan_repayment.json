@@ -29,7 +29,11 @@
   "loan_repayment_other_expenses",
   "total_other_expenses",
   "section_break_taia",
-  "total_repayment_amount"
+  "total_repayment_amount",
+  "column_break_zcpi",
+  "outstanding_from_loan",
+  "column_break_jcuk",
+  "overpayment"
  ],
  "fields": [
   {
@@ -201,12 +205,34 @@
    "fieldtype": "Data",
    "label": "Direct Approver",
    "read_only": 1
+  },
+  {
+   "fieldname": "column_break_zcpi",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "outstanding_from_loan",
+   "fieldtype": "Float",
+   "label": "Outstanding from Loan",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_jcuk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "overpayment",
+   "fieldtype": "Float",
+   "label": "Overpayment",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-01-28 09:41:12.143657",
+ "modified": "2025-02-06 13:01:12.835570",
  "modified_by": "Administrator",
  "module": "Purchase Loans",
  "name": "Purchase Loan Repayment",

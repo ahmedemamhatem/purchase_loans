@@ -6,6 +6,8 @@ import logging
 
 
 class PurchaseLoanRepayment(Document):
+
+
     def on_cancel(self):
         # Fetch all Journal Entries linked to this Purchase Loan Repayment
         """
@@ -332,11 +334,19 @@ class PurchaseLoanRepayment(Document):
 
 
     def validate(self):
+        
         """Validates duplicate entries and repayment constraints."""
         self._validate_duplicate_entries()
         self._sum_outstanding_and_expense_amounts()
         self._validate_currency()
-        
+        """Updates the Purchase Loan Repayment document with amounts from the linked Purchase Loan Request."""
+        purchase_loan_request = frappe.get_doc("Purchase Loan Request", self.purchase_loan_request, fields=["request_amount", "outstanding_amount_from_repayment"])
+        self.loan_amount = purchase_loan_request.request_amount
+        self.outstanding_amount = purchase_loan_request.outstanding_amount_from_repayment
+        outstanding_diff = (self.outstanding_amount or 0.0) - (self.total_repayment_amount or 0.0)
+        self.outstanding_from_loan = max(outstanding_diff, 0)
+        self.overpayment = abs(outstanding_diff) if outstanding_diff < 0 else 0
+
 
     def _validate_duplicate_entries(self):
         """Check for duplicate entries in invoices and expenses tables."""

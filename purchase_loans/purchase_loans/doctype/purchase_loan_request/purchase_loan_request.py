@@ -1,4 +1,6 @@
+import re
 import frappe
+from frappe.utils import strip_html_tags
 from frappe import throw, _
 from frappe.model.document import Document
 from frappe.utils import now
@@ -151,7 +153,6 @@ def copy_attachments_to_target(target_doctype, target_docname, source_doctype, s
 
     except Exception as e:
         frappe.log_error(f"Error in copying attachments: {str(e)}")
-        frappe.throw(_("An error occurred while copying attachments."))
 
 
 @frappe.whitelist()
@@ -293,6 +294,18 @@ def _create_journal_entry(purchase_loan_request_doc, payment_amount, company, em
     payment_amount_in_currency = payment_amount * exchange_rate
     ledger_amount = payment_amount_in_currency
     voucher_type = "Purchase Loan Repayment" if is_repayment else "Purchase Loan Payment"
+
+    # Remove HTML tags from purchase_items_details
+    clean_purchase_items_details = re.sub(r'\s+', ' ', strip_html_tags(purchase_loan_request_doc.purchase_items_details)).strip()
+
+    user_remark = _(
+        "{} made for Purchase Loan Request: {}\nPurchase Items Details: {}"
+    ).format(
+        "Repayment" if is_repayment else "Payment",
+        purchase_loan_request_doc.name,
+        clean_purchase_items_details
+    )
+
     journal_entry = frappe.get_doc({
         "doctype": "Journal Entry",
         "voucher_type": voucher_type,
@@ -300,7 +313,7 @@ def _create_journal_entry(purchase_loan_request_doc, payment_amount, company, em
         "custom_purchase_loan_request": purchase_loan_request_doc.name,
         "company": company,
         "multi_currency": 1,
-        "user_remark": _("Repayment made for Purchase Loan Request: {}").format(purchase_loan_request_doc.name),
+        "user_remark": user_remark,
         "accounts": [
             {
                 "account": from_account,
