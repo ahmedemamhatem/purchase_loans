@@ -106,22 +106,21 @@ def validate_sales_order(doc, method):
                     "You can only sell the Available after Reservations."
                 )
 
-    # Flag to track if all items are neither stock nor fixed assets
-    all_not_stock_or_fixed_asset = True
+    if not doc.packed_items:
+        all_not_stock_or_fixed_asset = True  # Assume all items are neither stock nor fixed assets
 
-    # Iterate through all items to check if any are stock or fixed assets
-    for item in doc.items:
-        is_stock_item = frappe.db.get_value("Item", item.item_code, "is_stock_item")
-        is_fixed_asset = frappe.db.get_value("Item", item.item_code, "is_fixed_asset")
+        for item in doc.items:
+            is_stock_item = frappe.db.get_value("Item", item.item_code, "is_stock_item")
+            is_fixed_asset = frappe.db.get_value("Item", item.item_code, "is_fixed_asset")
 
-        # If any item is a stock item or a fixed asset, mark the flag as False
-        if is_stock_item or is_fixed_asset:
-            all_not_stock_or_fixed_asset = False
-            break  # No need to check further if one item fails
+            # If any item is a stock item or a fixed asset, mark the flag as False
+            if is_stock_item or is_fixed_asset:
+                all_not_stock_or_fixed_asset = False
+                break  # No need to check further if one item fails
 
-        # Otherwise, mark item as delivered_by_supplier
-        item.delivered_by_supplier = 1
+            # Otherwise, mark item as delivered_by_supplier
+            item.delivered_qty = item.qty
 
-    # Set `per_delivered` to 100 if all items are neither stock nor fixed assets
-    if all_not_stock_or_fixed_asset:
-        doc.per_delivered = 100
+        # Set `per_delivered` to 100 if all items are neither stock nor fixed assets
+        if all_not_stock_or_fixed_asset:
+            doc.per_delivered = 100
