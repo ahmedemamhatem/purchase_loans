@@ -314,6 +314,8 @@ class PurchaseLoanRepayment(Document):
             purchase_invoice_exchange_rate = purchase_invoice.conversion_rate
             if party_currency != purchase_invoice_currency :
                 row.outstanding_amount = purchase_invoice.outstanding_amount / purchase_invoice_exchange_rate
+            else:
+                row.outstanding_amount = purchase_invoice.outstanding_amount
 
         self._sum_outstanding_and_expense_amounts()
         self._validate_currency()
