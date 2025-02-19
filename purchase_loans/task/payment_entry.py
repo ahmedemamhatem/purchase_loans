@@ -69,7 +69,7 @@ def validate_payment_entry(doc, method):
     doc.total_allocated_amount = total_allocated_amount
 
     # Optional validation to prevent overpayment
-    if doc.total_allocated_amount > total_outstanding_amount_net:
+    if doc.total_allocated_amount > abs(total_outstanding_amount_net):
         frappe.throw(
             _("Paid amount exceeds the total outstanding amount for the referenced invoices.")
         )
