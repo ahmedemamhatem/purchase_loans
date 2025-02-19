@@ -44,19 +44,26 @@ def validate_delivery_note(doc, method):
             if not m.so_detail:
                 continue  # Skip if so_detail is not set
             
-            so_detail = frappe.get_doc("Sales Order", m.so_detail)
+            try:
+                so_detail = frappe.get_doc("Sales Order", m.so_detail)
                 
-            # Validate Posting Date
-            if getdate(doc.posting_date) < getdate(so_detail.transaction_date):
-                frappe.throw(
-                    _("Posting Date ({0}) cannot be before Sales Order Date ({1}) for SO {2}")
-                    .format(doc.posting_date, so_detail.transaction_date, m.so_detail)
-                )
+                # Validate Posting Date
+                if getdate(doc.posting_date) < getdate(so_detail.transaction_date):
+                    frappe.throw(
+                        _("Posting Date ({0}) cannot be before Sales Order Date ({1}) for SO {2}")
+                        .format(doc.posting_date, so_detail.transaction_date, m.so_detail)
+                    )
 
-            if so_detail.custom_transaction_unique_id:
-                doc.custom_transaction_unique_id = so_detail.custom_transaction_unique_id
-                break  
+                if so_detail.custom_transaction_unique_id:
+                    doc.custom_transaction_unique_id = so_detail.custom_transaction_unique_id
+                    break  
+            except Exception as e:
+                frappe.log_error(f"Error fetching Sales Order {m.so_detail}: {str(e)}")
+                pass  # Continue processing other items
 
-        if not doc.is_new() and doc.custom_transaction_unique_id:
-            copy_attachments_to_target(doc.doctype, doc.name, "Sales Order")
-
+        try:
+            if not doc.is_new() and doc.custom_transaction_unique_id:
+                copy_attachments_to_target(doc.doctype, doc.name, "Sales Order")
+        except Exception as e:
+            frappe.log_error(f"Error copying attachments for Delivery Note {doc.name}: {str(e)}")
+            pass
