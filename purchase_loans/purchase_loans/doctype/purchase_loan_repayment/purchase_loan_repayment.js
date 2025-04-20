@@ -27,7 +27,7 @@ frappe.ui.form.on("Purchase Loan Repayment", {
             return {
                 filters: {
                     employee: frm.doc.employee,
-                    outstanding_amount: [">", 0]
+                    outstanding_amount_from_request: [">", 0]
                 }
             };
         });
